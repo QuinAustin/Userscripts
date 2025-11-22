@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Toggles
 // @namespace    Violentmonkey Scripts
-// @version      1.0
+// @version      1.0.1
 // @description  Allows disabling a variety of YouTube features
 // @author       -
 // @match        https://www.youtube.com/*
@@ -36,16 +36,21 @@
 
 
 
-    let enableLogging =       localStorage.getItem('enhancer-logging')        === 'false' ? false : true;
-    let showBreakingNews =    localStorage.getItem('enhancer-breaking-news')  === 'false' ? false : true;
-    let showShorts =          localStorage.getItem('enhancer-show-shorts')    === 'false' ? false : true;
-    let showGames =           localStorage.getItem('enhancer-show-games')     === 'false' ? false : true;
-    let showWatched =         localStorage.getItem('enhancer-show-watched')   === 'false' ? false : true;
-    let showPurchased =       localStorage.getItem('enhancer-show-purchased') === 'false' ? false : true;
-    let showAI =              localStorage.getItem('enhancer-show-ai')        === 'false' ? false : true;
-    let showMusic =           localStorage.getItem('enhancer-show-music')     === 'false' ? false : true;
-    let showPlaylists =       localStorage.getItem('enhancer-show-playlists') === 'false' ? false : true;
-    let showBanner =          localStorage.getItem('enhancer-show-banner')    === 'false' ? false : true;
+    let enableLogging    = localStorage.getItem('enhancer-logging')          === 'false' ? false : true;
+    let showBreakingNews = localStorage.getItem('enhancer-breaking-news')    === 'false' ? false : true;
+    let showShorts       = localStorage.getItem('enhancer-show-shorts')      === 'false' ? false : true;
+    let showGames        = localStorage.getItem('enhancer-show-games')       === 'false' ? false : true;
+    let showWatched      = localStorage.getItem('enhancer-show-watched')     === 'false' ? false : true;
+    let showPurchased    = localStorage.getItem('enhancer-show-purchased')   === 'false' ? false : true;
+    let showAI           = localStorage.getItem('enhancer-show-ai')          === 'false' ? false : true;
+    let showMusic        = localStorage.getItem('enhancer-show-music')       === 'false' ? false : true;
+    let showPlaylists    = localStorage.getItem('enhancer-show-playlists')   === 'false' ? false : true;
+    let showBanner       = localStorage.getItem('enhancer-show-banner')      === 'false' ? false : true;
+
+    let showFreeMovies   = localStorage.getItem('enhancer-show-free-movies') === 'false' ? false : true;
+    //not working yet
+    let showMemberOnly   = localStorage.getItem('enhancer-show-member-only') === 'false' ? false : true;
+
   //let showNew = localStorage.getItem('enhancer-show-new') === 'false' ? false : true;
 
     let fullyWatchedElements = new WeakSet();
@@ -57,15 +62,16 @@
             let watchedPercent = progressSegment ? parseFloat(progressSegment.style.width) || 0 : 0;
 
             if (watchedPercent === 100) { //can swap to being >= 50 if you want to also remove videos watched 50% of the way through
-                fullyWatchedElements.add(item);
+                //fullyWatchedElements.add(item);
+                item.style.display = showWatched ? '' : 'none';
             }
 
-            if (!showWatched && fullyWatchedElements.has(item)) {
-                item.style.display = 'none';
-            }
-            else {
-                item.style.display = '';
-            }
+            //if (!showWatched && fullyWatchedElements.has(item)) {
+            //    item.style.display = 'none';
+            //}
+            //else {
+            //    item.style.display = '';
+            //}
 
             if (enableLogging && !item.dataset.logged) {
               try {
@@ -124,76 +130,158 @@
         });
     }
 
+/* TODO
+    function toggleBadges() {
+      document.querySelectorAll('ytd-rich-item-renderer').forEach(item => {
+        const infoBadge =     item.querySelector('.yt-badge-shape__text')?.textContent.trim().toLowerCase();
+        const overlayBadge =  item.querySelector('.yt-badge-shape__icon');
+        let remove = false;
+
+        if (!infoBadge && !overlayBadge) {
+          return;
+        } //i.e. video has no badges to be found
+
+
+        //most common badge type
+        if (infoBadge) {
+
+          //music
+          if (!showMusic && infoBadge === 'mix') {
+            remove = true;
+          }
+          //playlist
+          else if (!showPlaylists && infoBadge.includes('episodes') || infoBadge.includes('lessons') || infoBadge.includes('videos')) {
+            remove = true;
+          }
+          //member only
+          else if (!showMemberOnly && infoBadge.includes('members only')) {
+            remove = true;
+          }
+        }
+
+        //uncommon badge type
+        else if (overlayBadge) {
+          try {
+            let svg = overlayBadge.querySelector('path').getAttribute('d');
+          }
+          catch (e) {
+            //no message
+          }
+          //music
+          if(!showMusic && svg.startsWith("M5")) {
+            remove = true;
+          }
+        }
+
+        item.style.display = !remove ? '' : 'none';
+      });
+    }
+*/
+
+
+
+
+
+
+
+
 
     function toggleMusic() {
       document.querySelectorAll('ytd-rich-item-renderer').forEach(item => {
-        const mixBadge = item.querySelector('.yt-badge-shape__text')?.textContent.trim().toLowerCase();
-        const mixBadge2 = item.querySelector('.yt-badge-shape__icon'); //this badge appears to the left of the duration
+          const mixBadge  = item.querySelector('.yt-badge-shape__text')?.textContent.trim().toLowerCase();
+          const mixBadge2 = item.querySelector('.yt-badge-shape__icon'); //this badge appears to the left of the duration
 
-        if (!mixBadge && !mixBadge2) { return }; //i.e. not a music video
+          if (!mixBadge && !mixBadge2) { return }; //i.e. not a music video
 
-        let m5 = false;
-        if (mixBadge2) {
-          try {
-            if (mixBadge2.querySelector('path').getAttribute('d').startsWith("M5")) { //might need to add an || d.startsWith("M2"), but it only happened once so not positive
-              //console.log('M5 found');
-              m5 = true;
-            }
+          let m5 = false;
+          if (mixBadge2) {
+              try {
+                  if (mixBadge2.querySelector('path').getAttribute('d').startsWith("M5")) { //might need to add an || d.startsWith("M2"), but it only happened once so not positive
+                      m5 = true;
+                  }
+              }
+              catch (e) {
+              }
           }
-          catch (e) {
+          if (mixBadge && mixBadge === 'mix' || m5 ) {
+              item.style.display = showMusic ? '' : 'none';
           }
-        }
-
-
-        if (mixBadge && mixBadge === 'mix' || m5 ) {
-          item.style.display = showMusic ? '' : 'none';
-        }
       });
     }
 
 
     function togglePlaylists() {
-      //might eventually need to add a check for the path M6 like in the music check.
-      document.querySelectorAll('ytd-rich-item-renderer').forEach(item => {
-        const playlistBadge = item.querySelector('.yt-badge-shape__text')?.textContent.trim().toLowerCase();
-        if (playlistBadge && (playlistBadge.includes('episodes') || playlistBadge.includes('lessons'))) {
-          item.style.display = showPlaylists ? '' : 'none';
-        }
-      });
+        //might eventually need to add a check for the path M6 like in the music check.
+        document.querySelectorAll('ytd-rich-item-renderer').forEach(item => {
+            const playlistBadge = item.querySelector('.yt-badge-shape__text')?.textContent.trim().toLowerCase();
+            if (playlistBadge && (playlistBadge.includes('episodes') || playlistBadge.includes('lessons') || playlistBadge.includes('videos'))) {
+              item.style.display = showPlaylists ? '' : 'none';
+            }
+        });
     }
-
-
     function togglePurchased() {
-      document.querySelectorAll('ytd-rich-item-renderer').forEach(item => {
-          const purchasedBadge = item.querySelector('ytd-badge-supported-renderer p');
-          if (purchasedBadge && purchasedBadge.textContent.trim().toLowerCase() === 'purchased') {
-              item.style.display = showPurchased ? '' : 'none';
-          }
-      });
+        document.querySelectorAll('ytd-rich-item-renderer').forEach(item => {
+            const purchasedBadge = item.querySelector('ytd-badge-supported-renderer p');
+            if (purchasedBadge && purchasedBadge.textContent.trim().toLowerCase() === 'purchased') {
+                item.style.display = showPurchased ? '' : 'none';
+            }
+        });
+    }
+    function toggleBanner() {
+        const banner = document.querySelector('ytd-statement-banner-renderer');
+        if (banner) {
+            banner.style.display = showBanner ? '' : 'none';
+        }
+    }
+
+
+    function toggleMemberOnly() {
+        document.querySelectorAll('ytd-rich-item-renderer').forEach(shelfItem => {
+            const text = shelfItem.querySelectorAll('.yt-badge-shape__text')[2]?.textContent.trim().toLowerCase();
+            if (!text) { return };
+
+            if (text === 'members only') {
+                shelfItem.style.display = showMemberOnly ? '' : 'none';
+            }
+        });
     }
 
 
 
+    function toggleFreeMovies() {
+        document.querySelectorAll('ytd-rich-item-renderer').forEach(shelfItem => {
+            const text = shelfItem.querySelectorAll('.yt-badge-shape__text')[2]?.textContent.trim().toLowerCase();
+            if (!text) { return };
 
-    function toggleBanner() {
-
-      const banner = document.querySelector('ytd-statement-banner-renderer');
-      if (banner) {
-        banner.style.display = showBanner ? '' : 'none';
-      }
+            if (text === 'free') {
+                shelfItem.style.display = showFreeMovies ? '' : 'none';
+            }
+        });
     }
 
   /*
     function toggleNew() {
-        document.querySelectorAll('ytd-rich-shelf-renderer').forEach(shelf => {
-            const title = shelf.querySelector('#title')?.textContent.trim().toLowerCase();
-            if (title && title.includes('youtube new_thing')) {
-                shelf.style.display = showNew ? '' : 'none';
+        document.querySelectorAll('ytd-rich-item-renderer').forEach(item => {
+            const text = item.querySelector('text-element')?.textContent.trim().toLowerCase();
+            if (text && text.includes('youtube new_thing')) {
+                item.style.display = showNew ? '' : 'none';
             }
         });
     }
   */
 
+    function debounce(func, delay) {
+        let timeout;
+        return function (...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                func.apply(this, args);
+            }, delay);
+        };
+    }
+    const dToggleFreeMovies = debounce(toggleFreeMovies, 100);
+    const dToggleMemberOnly = debounce(toggleMemberOnly, 100);
+    const dToggleMusic      = debounce(toggleMusic,      100);
 
     function startObservers() {
         const observer = new MutationObserver(() => {
@@ -204,10 +292,19 @@
             toggleGamesShelf();
             togglePurchased();
             toggleAIShelf();
-            toggleMusic();
+
+
+            //toggleBadges();
+            dToggleMusic();
             togglePlaylists();
             toggleBanner();
+            dToggleFreeMovies();
+
+            //TODO
+            dToggleMemberOnly();
+
             //toggleNew();
+
         });
         observer.observe(document.body, { childList: true, subtree: true });
     }
@@ -220,40 +317,40 @@
         if (!voiceSearchButton) return;
 
         const menuButton = document.createElement('yt-button');
-        menuButton.className = 'yt-spec-button-shape-next--size-m';
-        menuButton.textContent = 'Enhancer Menu';
-        menuButton.style.cursor = 'pointer';
-        menuButton.style.marginLeft = '10px';
+        menuButton.className             = 'yt-spec-button-shape-next--size-m';
+        menuButton.textContent           = 'Enhancer Menu';
+        menuButton.style.cursor          = 'pointer';
+        menuButton.style.marginLeft      = '10px';
         menuButton.style.backgroundColor = 'rgba(255,255,255,0.1)';
-        menuButton.style.color = '#f1f1f1';
-        menuButton.style.padding = '6px 16px';
-        menuButton.style.borderRadius = '9999px';
-        menuButton.style.height = '32px';
-        menuButton.style.minWidth = 'auto';
-        menuButton.style.fontSize = '14px';
-        menuButton.style.fontWeight = '500';
-        menuButton.style.display = 'inline-flex';
-        menuButton.style.alignItems = 'center';
-        menuButton.style.justifyContent = 'center';
+        menuButton.style.color           = '#f1f1f1';
+        menuButton.style.padding         = '6px 16px';
+        menuButton.style.borderRadius    = '9999px';
+        menuButton.style.height          = '32px';
+        menuButton.style.minWidth        = 'auto';
+        menuButton.style.fontSize        = '14px';
+        menuButton.style.fontWeight      = '500';
+        menuButton.style.display         = 'inline-flex';
+        menuButton.style.alignItems      = 'center';
+        menuButton.style.justifyContent  = 'center';
 
         menuButton.addEventListener('mouseenter', () => { menuButton.style.backgroundColor = 'rgba(255,255,255,0.15)'; });
         menuButton.addEventListener('mouseleave', () => { menuButton.style.backgroundColor = 'rgba(255,255,255,0.1)'; });
-        menuButton.addEventListener('mousedown', () => { menuButton.style.transform = 'scale(0.95)'; });
-        menuButton.addEventListener('mouseup', () => { menuButton.style.transform = 'scale(1)'; });
+        menuButton.addEventListener('mousedown',  () => { menuButton.style.transform       = 'scale(0.95)'; });
+        menuButton.addEventListener('mouseup',    () => { menuButton.style.transform       = 'scale(1)'; });
 
         const menuContainer = document.createElement('div');
-        menuContainer.style.position = 'fixed';
+        menuContainer.style.position =        'fixed';
         menuContainer.style.backgroundColor = '#222';
-        menuContainer.style.color = '#fff';
-        menuContainer.style.padding = '10px';
-        menuContainer.style.display = 'none';
-        menuContainer.style.zIndex = '9999';
-        menuContainer.style.border = '1px solid #555';
-        menuContainer.style.boxShadow = '0 2px 10px rgba(0,0,0,0.5)';
-        menuContainer.style.whiteSpace = 'nowrap';
-        menuContainer.style.flexDirection = 'column';
-        menuContainer.style.gap = '5px';
-        menuContainer.style.borderRadius = '4px';
+        menuContainer.style.color =           '#fff';
+        menuContainer.style.padding =         '10px';
+        menuContainer.style.display =         'none';
+        menuContainer.style.zIndex =          '9999';
+        menuContainer.style.border =          '1px solid #555';
+        menuContainer.style.boxShadow =       '0 2px 10px rgba(0,0,0,0.5)';
+        menuContainer.style.whiteSpace =      'nowrap';
+        menuContainer.style.flexDirection =   'column';
+        menuContainer.style.gap =             '5px';
+        menuContainer.style.borderRadius =    '4px';
 
         const createCheckbox = (labelText, settingKey, onChange) => {
             const wrapper = document.createElement('div');
@@ -279,18 +376,23 @@
             return wrapper;
         };
 
-        // Menu options
-        menuContainer.appendChild(createCheckbox('Log Metadata', 'enhancer-logging', () => { enableLogging = !enableLogging; processVideos(); }));
-        menuContainer.appendChild(createCheckbox('Show Breaking News', 'enhancer-breaking-news', () => { showBreakingNews = !showBreakingNews; toggleBreakingNewsShelf(); }));
-        menuContainer.appendChild(createCheckbox('Show Shorts', 'enhancer-show-shorts', () => { showShorts = !showShorts; toggleShortsShelf(); }));
-        menuContainer.appendChild(createCheckbox('Show Games', 'enhancer-show-games', () => { showGames = !showGames; toggleGamesShelf()}))
-        menuContainer.appendChild(createCheckbox('Show Purchased Videos', 'enhancer-show-purchased', () => { showPurchased = !showPurchased; togglePurchased(); }));
-        menuContainer.appendChild(createCheckbox('Show Watched Videos', 'enhancer-show-watched', () => { showWatched = !showWatched; processVideos(); }));
-        menuContainer.appendChild(createCheckbox('Show AI', 'enhancer-show-ai', () => { showAI = !showAI; toggleAIShelf()}))
-        menuContainer.appendChild(createCheckbox('Show Music', 'enhancer-show-music', () => { showMusic = !showMusic; toggleMusic()}))
-        menuContainer.appendChild(createCheckbox('Show Playlists and Podcasts', 'enhancer-show-playlists', () => { showPlaylists = !showPlaylists; togglePlaylists()}))
-        menuContainer.appendChild(createCheckbox('Show Banner', 'enhancer-show-banner', () => { showBanner = !showBanner; toggleBanner()}))
-      //menuContainer.appendChild(createCheckbox('Show New', 'enhancer-show-new', () => { showNew = !showNew; toggleNew()}))
+        //Toggle Menu Options
+        menuContainer.appendChild(createCheckbox('Log Metadata',                'enhancer-logging',          () => { enableLogging    = !enableLogging;    processVideos();           }));
+        menuContainer.appendChild(createCheckbox('Show Breaking News',          'enhancer-breaking-news',    () => { showBreakingNews = !showBreakingNews; toggleBreakingNewsShelf(); }));
+        menuContainer.appendChild(createCheckbox('Show Shorts',                 'enhancer-show-shorts',      () => { showShorts       = !showShorts;       toggleShortsShelf();       }));
+        menuContainer.appendChild(createCheckbox('Show Games',                  'enhancer-show-games',       () => { showGames        = !showGames;        toggleGamesShelf();        }));
+        menuContainer.appendChild(createCheckbox('Show Purchased Videos',       'enhancer-show-purchased',   () => { showPurchased    = !showPurchased;    togglePurchased();         }));
+        menuContainer.appendChild(createCheckbox('Show Watched Videos',         'enhancer-show-watched',     () => { showWatched      = !showWatched;      processVideos();           }));
+        menuContainer.appendChild(createCheckbox('Show AI',                     'enhancer-show-ai',          () => { showAI           = !showAI;           toggleAIShelf();           }));
+        menuContainer.appendChild(createCheckbox('Show Music',                  'enhancer-show-music',       () => { showMusic        = !showMusic;        toggleMusic();             }));
+        menuContainer.appendChild(createCheckbox('Show Playlists and Podcasts', 'enhancer-show-playlists',   () => { showPlaylists    = !showPlaylists;    togglePlaylists();         }));
+        menuContainer.appendChild(createCheckbox('Show Banner',                 'enhancer-show-banner',      () => { showBanner       = !showBanner;       toggleBanner();            }));
+        menuContainer.appendChild(createCheckbox('Show Free Movies',            'enhancer-show-free-movies', () => { showFreeMovies   = !showFreeMovies;   toggleFreeMovies();        }));
+
+        //Still Field Testing
+        menuContainer.appendChild(createCheckbox('Show Member Only (beta)',     'enhancer-show-member-only', () => { showMemberOnly   = !showMemberOnly;   toggleMemberOnly();        }));
+
+      //menuContainer.appendChild(createCheckbox('Show New',                    'enhancer-show-new',         () => { showNew          = !showNew;          toggleNew();               }));
 
         document.body.appendChild(menuContainer);
         voiceSearchButton.parentElement.appendChild(menuButton);
