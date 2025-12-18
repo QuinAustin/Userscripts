@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Toggles
 // @namespace    Violentmonkey Scripts
-// @version      1.0.3
+// @version      1.0.4
 // @description  Allows disabling a variety of YouTube features
 // @author       -
 // @match        https://www.youtube.com/*
@@ -12,6 +12,59 @@
 // @downloadURL https://raw.githubusercontent.com/QuinAustin/Userscripts/main/youtubeToggles.js
 //
 // ==/UserScript==
+
+
+
+/*changelog 1.3
+
+
+    *New feature
+        -Now able to have more videos per row. Number of videos increases by 1 for each level of zoom out.
+        -Testing a feature to remove the "new to you" prompts that take up a video's location (this happens on the homepage, and is different from the ai prompt)
+
+
+    *Starting to combine different toggle functions into a single function based on their similar queries
+        -this should start to help with performance and memory consumption
+
+    *Streamer Mode is now the first observer function called, therefore hopefully removing potentially sensitive information faster.
+
+    *Mouse pointer now shows when hovering over the Enhancer Menu checkbox, instead of the label text
+
+
+changelog 1.4
+
+=============
+    DONE
+=============
+
+        when watching videos
+            -Toggle Free Movies now removes from the left recommendation
+
+        debug mode now available to help with some errors
+
+        Toggle to remove the
+            - "Explore More Topics" section
+            - "Latest YouTube Posts" section
+
+        Now removes the 'is-in-first-column' attribute from videos, this fixes the gaps seen in between rows of videos
+        Now removes shelfs from the section container instead, this also fixes the gaps seen in between rows of videos
+
+        Badge checks are finally in their own function, might get merged later with the item checks
+
+        Now checks the current URL to know if the user is on the homepage or watching a video. This allows for less useless function calls
+        There is now "Script Started" at start up logged in the console
+
+        Functions that had a lot of repeatable if statements now have switch-cases, and some were made switch-cases as they are going to have more cases in the future.
+
+
+
+=============
+    TODO
+=============
+
+    *New Features
+        -Get Toggle Members to work (can be difficult when they don't get recommended as much to me anymore)
+*/
 
 (function() {
     'use strict';
@@ -33,26 +86,29 @@
     showBanner       | big banner at the top of the homepage, usually some YouTube Ad/Event
     */
 
+    let debugMode               = localStorage.getItem('enhancer-debug-mode')       === 'false' ? false : true;
 
+    let enableLogging           = localStorage.getItem('enhancer-logging')          === 'false' ? false : true;
 
+    let showBreakingNews        = localStorage.getItem('enhancer-breaking-news')    === 'false' ? false : true;
+    let showShorts              = localStorage.getItem('enhancer-show-shorts')      === 'false' ? false : true;
+    let showGames               = localStorage.getItem('enhancer-show-games')       === 'false' ? false : true;
 
-    let enableLogging    = localStorage.getItem('enhancer-logging')          === 'false' ? false : true;
-    let showBreakingNews = localStorage.getItem('enhancer-breaking-news')    === 'false' ? false : true;
-    let showShorts       = localStorage.getItem('enhancer-show-shorts')      === 'false' ? false : true;
-    let showGames        = localStorage.getItem('enhancer-show-games')       === 'false' ? false : true;
-    let showWatched      = localStorage.getItem('enhancer-show-watched')     === 'false' ? false : true;
-    let showPurchased    = localStorage.getItem('enhancer-show-purchased')   === 'false' ? false : true;
-    let showAI           = localStorage.getItem('enhancer-show-ai')          === 'false' ? false : true;
-    let showNewToYou     = localStorage.getItem('enhancer=show-new-to-you')  === 'false' ? false : true;
+    let showExploreMoreTopics   = localStorage.getItem('enhancer-show-explore-more-topics') === 'false' ? false : true;
 
-    let showMusic        = localStorage.getItem('enhancer-show-music')       === 'false' ? false : true;
-    let showPlaylists    = localStorage.getItem('enhancer-show-playlists')   === 'false' ? false : true;
-    let showBanner       = localStorage.getItem('enhancer-show-banner')      === 'false' ? false : true;
+    let showAI                  = localStorage.getItem('enhancer-show-ai')          === 'false' ? false : true;
+    let showWatched             = localStorage.getItem('enhancer-show-watched')     === 'false' ? false : true;
+    let showPurchased           = localStorage.getItem('enhancer-show-purchased')   === 'false' ? false : true;
+    let showNewToYou            = localStorage.getItem('enhancer=show-new-to-you')  === 'false' ? false : true;
 
-    let showFreeMovies   = localStorage.getItem('enhancer-show-free-movies') === 'false' ? false : true;
+    let showMusic               = localStorage.getItem('enhancer-show-music')       === 'false' ? false : true;
+    let showPlaylists           = localStorage.getItem('enhancer-show-playlists')   === 'false' ? false : true;
+    let showBanner              = localStorage.getItem('enhancer-show-banner')      === 'false' ? false : true;
+
+    let showFreeMovies          = localStorage.getItem('enhancer-show-free-movies') === 'false' ? false : true;
     //not working yet
-    let showMemberOnly   = localStorage.getItem('enhancer-show-member-only') === 'false' ? false : true;
-
+    let showMemberOnly          = localStorage.getItem('enhancer-show-member-only') === 'false' ? false : true;
+    let showPosts               = localStorage.getItem('enchancer-show-posts')      === 'false' ? false : true;
 
 
 
@@ -64,7 +120,7 @@
 
     let moreVideosPerRow      = localStorage.getItem('enchancer-more-videos-per-row') === 'false' ? false : true;
 
-
+    //let new                 = localStorage.getItem('enchancer-new')                 === 'false' ? false : true;
 
 
     function toggleQuerySelector(selector, enabled) {
@@ -82,77 +138,53 @@
         } catch(e) {}
     }
 
-    //function toggleQuerySelectorAll(selector) {
-    //    document.querySelectorAll(selector).forEach(query => {
-    //    })
-    //}
+
+
 
     function startShelfChecks() {
           //console.log("starting shelf checks");
 
-        container = document.getElementById('contents');
+        const container = document.getElementById('contents');
         if (container) {
-            container.querySelectorAll('ytd-rich-shelf-renderer').forEach(query => {
+            container.querySelectorAll('ytd-rich-section-renderer').forEach(query => {
                 const title = query.querySelector('#title')?.textContent.trim().toLowerCase();
 
-                if (title) {
-                    //Shorts Shelf
-                    if (title.includes('shorts')) {
+                if(debugMode) {
+                    console.log("title: ",title);
+                }
+
+                switch (title) {
+                    case 'shorts':
                         query.style.display = showShorts ? '' : 'none';
-                    }
-                    //Games Shelf (not tested)
-                    if (title.includes('youtube playables')) {
+                    break;
+                    case 'youtube playables':
                         query.style.display = showGames ? '' : 'none';
-                    }
-                    //Breaking News Shelf (not tested)
-                    if (title === 'breaking news') {
+                    break;
+                    case 'breaking news':
                         query.style.display = showBreakingNews ? '' : 'none';
-                    }
+                    break;
+                    case 'latest youtube posts':
+                        query.style.display = showPosts ? '' : 'none';
+                    break;
+                    case 'explore more topics':
+                        query.style.display = showExploreMoreTopics ? ''  : 'none';
+                    break;
+                    default:
+                        if(debugMode) {
+                            console.log("title not recognized: ",title);
+                        }
                 }
             });
         }
-        else {
+        else if (debugMode) {
             console.log("videos have not been loaded yet");
         }
     }
 
 
-
-    //function toggleShortsShelf() {
-    //    document.querySelectorAll('ytd-rich-shelf-renderer').forEach(shelf => {
-    //        const title = shelf.querySelector('#title')?.textContent.trim().toLowerCase();
-    //        if (title && title.includes('shorts')) {
-    //            shelf.style.display = showShorts ? '' : 'none';
-    //        }
-    //    });
-    //}
-
-    //function toggleBreakingNewsShelf() {
-    //    document.querySelectorAll('ytd-rich-shelf-renderer').forEach(shelf => {
-    //        const title = shelf.querySelector('#title')?.textContent.trim().toLowerCase();
-    //        if (title === 'breaking news') {
-    //            shelf.style.display = showBreakingNews ? '' : 'none';
-    //        }
-    //    });
-    //}
-
-    //function toggleGamesShelf() {
-    //    document.querySelectorAll('ytd-rich-shelf-renderer').forEach(shelf => {
-    //        const title = shelf.querySelector('#title')?.textContent.trim().toLowerCase();
-    //        if (title && title.includes('youtube playables')) {
-    //            shelf.style.display = showGames ? '' : 'none';
-    //        }
-    //    });
-    //}
-
-
-
-
-
-
     function startItemChecks() {
         //console.log("starting item checks");
-        container = document.getElementById('contents');
+        const container = document.getElementById('contents');
         if (container) {
             container.querySelectorAll('ytd-rich-item-renderer').forEach(query => {
 
@@ -178,15 +210,16 @@
 
             });
         }
-        else {
+        else if (debugMode) {
             console.log("videos have not been loaded yet");
         }
     }
 
 
-
     function startVideoChecks() {
-
+        //Videos: 'yt-lockup-view-model'
+        //Shorts: 'ytd-reel-shelf-renderer'
+        //Movies: 'ytd-compact-movie-renderer'
 
 
         //AI Summary Under Video Players
@@ -196,52 +229,57 @@
         } catch(e) {}
 
 
+        try {
+            const container = document.querySelector('#secondary #secondary-inner #related #items ytd-item-section-renderer #contents');
+            if (debugMode) {
+                console.log("container:", {container});
+            }
+
+            if (container) {
+                container.querySelectorAll('ytd-compact-movie-renderer').forEach(query => {
+
+                    const badgeTextAll   = query.querySelectorAll('.yt-badge-shape__text');
+                    const badgeIcon     = query.querySelector('.yt-badge-shape__icon'); //this badge appears to the left of the duration
+                    const badgeRenderer = query.querySelector('ytd-badge-supported-renderer p');
 
 
+                    if (debugMode) {
+                        console.log('badgeTextAll: ', {badgeTextAll});
+                        console.log('badgeTextAll[0]: ', badgeTextAll[0]?.textContent.trim().toLowerCase());
+                        console.log('badgeTextAll[1]: ', badgeTextAll[1]?.textContent.trim().toLowerCase());
+                        console.log('badgeTextAll[2]: ', badgeTextAll[2]?.textContent.trim().toLowerCase());
 
+                        console.log('badgeIcon: ', badgeIcon);
+                        console.log('badgeRenderer: ', badgeRenderer);
+                    }
+
+
+                    if (badgeTextAll[1]) {
+                        if (debugMode) {
+                            console.log("badgeTextAll[1] found");
+                        }
+                        //showFreeMovies
+                        if (badgeTextAll[1]?.textContent.trim().toLowerCase() === 'free') {
+                            query.style.display = showFreeMovies ? '' : 'none';
+                        }
+                    }
+                });
+            }
+        } catch(e) {}
     }
 
-
-   // function togglePlaylists() {
-   //     //might eventually need to add a check for the path M6 like in the music check.
-   //     document.querySelectorAll('ytd-rich-item-renderer').forEach(item => {
-   //         const playlistBadge = item.querySelector('.yt-badge-shape__text')?.textContent.trim().toLowerCase();
-   //         if (playlistBadge && (playlistBadge.includes('episodes') || playlistBadge.includes('lessons') || playlistBadge.includes('videos'))) {
-   //           item.style.display = showPlaylists ? '' : 'none';
-   //         }
-   //     });
-   // }
-
- //   function toggleAI() {
- //       document.querySelectorAll('ytd-rich-section-renderer').forEach(section => {
- //           if (section.querySelector('ytd-talk-to-recs-flow-renderer')) {
- //               section.style.display = showAI ? '' : 'none';
- //           }
- //       });
- //
- //       try {
- //           const aiSummary = document.getElementById('expandable-metadata');
- //           aiSummary.style.display = showAI ? '' : 'none';
- //       } catch(e) {}
- //   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-  //let showNew = localStorage.getItem('enhancer-show-new') === 'false' ? false : true;
 
     function processVideos() {
         const items = document.querySelectorAll('ytd-rich-item-renderer');
         items.forEach(item => {
+            if(item.hasAttribute('is-in-first-column')) {
+                item.removeAttribute('is-in-first-column');
+            }
+            else if (debugMode) {
+                console.log(item.getAttributeNames());
+            }
+
+
             const progressSegment = item.querySelector('.ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment');
             let watchedPercent = progressSegment ? parseFloat(progressSegment.style.width) || 0 : 0;
 
@@ -272,99 +310,57 @@
     }
 
 
+    function startItemBadgeChecks() {
+        container = document.getElementById('contents');
+            if (container) {
+                container.querySelectorAll('ytd-rich-item-renderer').forEach(query => {
+
+                    const badgeText     = query.querySelector('.yt-badge-shape__text')?.textContent.trim().toLowerCase();
+                    const badgeText2    = query.querySelectorAll('.yt-badge-shape__text')[2]?.textContent.trim().toLowerCase();
+                    const badgeIcon     = query.querySelector('.yt-badge-shape__icon'); //this badge appears to the left of the duration
+                    const badgeRenderer = query.querySelector('ytd-badge-supported-renderer p');
+
+
+                    if (debugMode) {
+                        console.log('badgeText: ', badgeText);
+                        console.log('badgeText2: ', badgeText2);
+                        console.log('badgeIcon: ', badgeIcon);
+                        console.log('badgeRenderer: ', badgeRenderer);
+                    }
 
 
 
 
-/* TODO
-    function toggleBadges() {
-      document.querySelectorAll('ytd-rich-item-renderer').forEach(item => {
-        const infoBadge =     item.querySelector('.yt-badge-shape__text')?.textContent.trim().toLowerCase();
-        const overlayBadge =  item.querySelector('.yt-badge-shape__icon');
-        let remove = false;
+                    switch (badgeText) {
+                        case 'mix':
+                            query.style.display = showMusic ? '' : 'none';
+                    }
 
-        if (!infoBadge && !overlayBadge) {
-          return;
-        } //i.e. video has no badges to be found
+                    switch (badgeText2) {
+                        case 'members only':
+                            query.style.display = showMemberOnly ? '' : 'none';
 
+                        case 'free':
+                            query.style.display = showFreeMovies ? '' : 'none';
+                    }
+                    try {
+                        switch (badgeIcon) {
+                            case ( badgeIcon.querySelector('path').getAttribute('d').startsWith("M5") ):
+                                query.style.display = showMusic ? '' : 'none';
+                        }
+                    } catch(e) {}
 
-        //most common badge type
-        if (infoBadge) {
-
-          //music
-          if (!showMusic && infoBadge === 'mix') {
-            remove = true;
-          }
-          //playlist
-          else if (!showPlaylists && infoBadge.includes('episodes') || infoBadge.includes('lessons') || infoBadge.includes('videos')) {
-            remove = true;
-          }
-          //member only
-          else if (!showMemberOnly && infoBadge.includes('members only')) {
-            remove = true;
-          }
-        }
-
-        //uncommon badge type
-        else if (overlayBadge) {
-          try {
-            let svg = overlayBadge.querySelector('path').getAttribute('d');
-          }
-          catch (e) {
-            //no message
-          }
-          //music
-          if(!showMusic && svg.startsWith("M5")) {
-            remove = true;
-          }
-        }
-
-        item.style.display = !remove ? '' : 'none';
-      });
-    }
-*/
+                    switch(badgeRenderer) {
+                        case 'purchased':
+                            query.style.display = showPurchased ? '' : 'none';
+                    }
 
 
-
-
-
-
-
-
-
-    function toggleMusic() {
-      document.querySelectorAll('ytd-rich-item-renderer').forEach(item => {
-          const mixBadge  = item.querySelector('.yt-badge-shape__text')?.textContent.trim().toLowerCase();
-          const mixBadge2 = item.querySelector('.yt-badge-shape__icon'); //this badge appears to the left of the duration
-
-          if (!mixBadge && !mixBadge2) { return }; //i.e. not a music video
-
-          let m5 = false;
-          if (mixBadge2) {
-              try {
-                  if (mixBadge2.querySelector('path').getAttribute('d').startsWith("M5")) { //might need to add an || d.startsWith("M2"), but it only happened once so not positive
-                      m5 = true;
-                  }
-              }
-              catch (e) {
-              }
-          }
-          if (mixBadge && mixBadge === 'mix' || m5 ) {
-              item.style.display = showMusic ? '' : 'none';
-          }
-      });
-    }
-
-
-
-    function togglePurchased() {
-        document.querySelectorAll('ytd-rich-item-renderer').forEach(item => {
-            const purchasedBadge = item.querySelector('ytd-badge-supported-renderer p');
-            if (purchasedBadge && purchasedBadge.textContent.trim().toLowerCase() === 'purchased') {
-                item.style.display = showPurchased ? '' : 'none';
+                });
             }
-        });
     }
+
+
     function toggleBanner() {
         const banner = document.querySelector('ytd-statement-banner-renderer');
         if (banner) {
@@ -373,77 +369,16 @@
     }
 
 
-    function toggleMemberOnly() {
-        document.querySelectorAll('ytd-rich-item-renderer').forEach(shelfItem => {
-            const text = shelfItem.querySelectorAll('.yt-badge-shape__text')[2]?.textContent.trim().toLowerCase();
-            if (!text) { return };
-
-            if (text === 'members only') {
-                shelfItem.style.display = showMemberOnly ? '' : 'none';
-            }
-        });
-    }
-
-
-
-    function toggleFreeMovies() {
-        document.querySelectorAll('ytd-rich-item-renderer').forEach(shelfItem => {
-            const text = shelfItem.querySelectorAll('.yt-badge-shape__text')[2]?.textContent.trim().toLowerCase();
-            if (!text) { return };
-
-            if (text === 'free') {
-                shelfItem.style.display = showFreeMovies ? '' : 'none';
-            }
-        });
-    }
-
-
-
-    //STREAMER MODE
-
-
-
-
-
-    function toggleStreamerMode() { //for both private people looking to share their screens in discord and streamers watching videos on their personal or premium accounts, so no ads would be a better experience)
+    function toggleStreamerMode() {
         const enabled = enableStreamerMode ? 'none' : '';
 
-        //if (enabled === 'none') {
             toggleQuerySelector('ytd-merch-shelf-renderer', enabled);                //toggle Merch Under Videos
             toggleQuerySelector('ytd-comment-simplebox-renderer', enabled);          //toggle Commenting Under Videos
             toggleQuerySelector('ytd-topbar-menu-button-renderer', enabled);         //toggle top right profile picture
             toggleQuerySelector('ytd-guide-section-renderer:nth-child(2)', enabled); //toggle subscriptions on the left side menu on the homepage
 
-
-//            document.querySelectorAll('ytd-merch-shelf-renderer', 'ytd-comment-simplebox-renderer', 'ytd-topbar-menu-button-renderer', 'ytd-guide-section-renderer:nth-child(2)').forEach(query => {
-//                query.style.display = enabled;
-//            });
-
-
-
-
             toggleGetElementById('country-code', enabled);                           //toggle users country on the top left logo
-        //}
 
-
-
-
-
-
-
-
-
-
-        //potentially an even stricter version (breaks watching videos)
-        //try {
-        //    const homepage = document.getElementById('contents');
-        //    homepage.style.display = enableStreamerMode ? 'none' : '';
-        //} catch(e) {}
-      //
-        //try {
-        //    const filter = document.getElementById('primary');
-        //    filter.style.display = enableStreamerMode ? 'none' : '';
-        //} catch(e) {}
     }
 
 
@@ -459,9 +394,6 @@
         });
     }
   */
-
-
-
 
 
     function checkItemsPerRow() {
@@ -488,55 +420,27 @@
             }, delay);
         };
     }
-    const dToggleFreeMovies = debounce(toggleFreeMovies, 100);
-    const dToggleMemberOnly = debounce(toggleMemberOnly, 100);
-    const dToggleMusic      = debounce(toggleMusic,      100);
     const dcheckItemsPerRow = debounce(checkItemsPerRow, 1000);
 
     function startObservers() {
         const observer = new MutationObserver(() => {
+
             toggleStreamerMode();
 
-            dcheckItemsPerRow();
+            let currentURL = document.URL;
 
-            processVideos();
+            if (currentURL === "https://www.youtube.com/") {
+                toggleBanner();
+                dcheckItemsPerRow();
+                processVideos();
+                startShelfChecks();
+                startItemChecks();
+                startItemBadgeChecks();
+            }
 
-            //toggleBreakingNewsShelf();
-            //toggleShortsShelf();
-            //toggleGamesShelf();
-            startShelfChecks();
-
-            //togglePlaylists();
-            //toggleAI(); //homepage prompt
-            //new to you video prompt
-            startItemChecks();
-
-            //toggleAI(); //video summary
-            startVideoChecks();
-
-
-
-            togglePurchased();
-
-
-
-            //toggleBadges();
-            dToggleMusic();
-
-
-
-
-
-            toggleBanner();
-            dToggleFreeMovies();
-
-            //TODO
-            dToggleMemberOnly();
-
-
-
-            //toggleNew();
-
+            else if (currentURL.startsWith("https://www.youtube.com/watch?v=")) {
+                startVideoChecks();
+            }
         });
         observer.observe(document.body, { childList: true, subtree: true });
     }
@@ -611,27 +515,38 @@
         };
 
         //Toggle Menu Options
-        menuContainer.appendChild(createCheckbox('Log Metadata',                        'enhancer-logging',               () => { enableLogging      = !enableLogging;    processVideos();                          }));
-        menuContainer.appendChild(createCheckbox('Show Breaking News',                  'enhancer-breaking-news',         () => { showBreakingNews   = !showBreakingNews; startShelfChecks();                       }));//toggleBreakingNewsShelf();
-        menuContainer.appendChild(createCheckbox('Show Shorts',                         'enhancer-show-shorts',           () => { showShorts         = !showShorts;       startShelfChecks()                        }));//toggleShortsShelf();
-        menuContainer.appendChild(createCheckbox('Show Games',                          'enhancer-show-games',            () => { showGames          = !showGames;        startShelfChecks();                       }));//toggleGamesShelf();
-        menuContainer.appendChild(createCheckbox('Show Purchased Videos',               'enhancer-show-purchased',        () => { showPurchased      = !showPurchased;    togglePurchased();                        }));
-        menuContainer.appendChild(createCheckbox('Show Watched Videos',                 'enhancer-show-watched',          () => { showWatched        = !showWatched;      processVideos();                          }));
-        menuContainer.appendChild(createCheckbox('Show AI',                             'enhancer-show-ai',               () => { showAI             = !showAI;           startItemChecks();startVideoChecks();     }));
-        menuContainer.appendChild(createCheckbox('Show Music',                          'enhancer-show-music',            () => { showMusic          = !showMusic;        toggleMusic();                            }));
-        menuContainer.appendChild(createCheckbox('Show Playlists and Podcasts',         'enhancer-show-playlists',        () => { showPlaylists      = !showPlaylists;    startItemChecks();                        }));//togglePlaylists();
-        menuContainer.appendChild(createCheckbox('Show Banner',                         'enhancer-show-banner',           () => { showBanner         = !showBanner;       toggleBanner();                           }));
-        menuContainer.appendChild(createCheckbox('Show Free Movies',                    'enhancer-show-free-movies',      () => { showFreeMovies     = !showFreeMovies;   toggleFreeMovies();                       }));
+        menuContainer.appendChild(createCheckbox('Debug Mode',                          'enhancer-debug-mode',            () => { debugMode          = !debugMode;                                                      }));
+
+
+        menuContainer.appendChild(createCheckbox('Log Metadata',                        'enhancer-logging',                         () => { enableLogging           = !enableLogging;           processVideos();        }));
+
+
+        menuContainer.appendChild(createCheckbox('Show Watched Videos',                 'enhancer-show-watched',                    () => { showWatched             = !showWatched;             processVideos();        }));
+        menuContainer.appendChild(createCheckbox('Show Breaking News',                  'enhancer-breaking-news',                   () => { showBreakingNews        = !showBreakingNews;        startShelfChecks();     }));
+        menuContainer.appendChild(createCheckbox('Show Shorts',                         'enhancer-show-shorts',                     () => { showShorts              = !showShorts;              startShelfChecks()      }));
+        menuContainer.appendChild(createCheckbox('Show Games',                          'enhancer-show-games',                      () => { showGames               = !showGames;               startShelfChecks();     }));
+        /*untested*/menuContainer.appendChild(createCheckbox('Show Explore More Topics',            'enhancer-show-explore-more-topics',        () => { showExploreMoreTopics   = !showExploreMoreTopics;   startShelfChecks();     }));
+
+
+        menuContainer.appendChild(createCheckbox('Show AI',                             'enhancer-show-ai',               () => { showAI             = !showAI;           startItemChecks();startVideoChecks();         }));
+        menuContainer.appendChild(createCheckbox('Show Playlists and Podcasts',         'enhancer-show-playlists',        () => { showPlaylists      = !showPlaylists;    startItemChecks();                            }));
+        menuContainer.appendChild(createCheckbox('Show Purchased Videos',               'enhancer-show-purchased',        () => { showPurchased      = !showPurchased;    startItemBadgeChecks();                       }));
+        menuContainer.appendChild(createCheckbox('Show Music',                          'enhancer-show-music',            () => { showMusic          = !showMusic;        startItemBadgeChecks();                       }));
+        menuContainer.appendChild(createCheckbox('Show Free Movies',                    'enhancer-show-free-movies',      () => { showFreeMovies     = !showFreeMovies;   startItemBadgeChecks();startVideoChecks();    }));
+        menuContainer.appendChild(createCheckbox('Show Banner',                         'enhancer-show-banner',           () => { showBanner         = !showBanner;       toggleBanner();                               }));
+
+        //Still Making Tweaks
+        menuContainer.appendChild(createCheckbox('Show More Videos Per Row',            'enhancer-more-videos-per-row',   () => { moreVideosPerRow   = !moreVideosPerRow;   checkItemsPerRow();      }));
+        menuContainer.appendChild(createCheckbox('Enable Streamer Mode',                'enhancer-enable-streamer-mode',  () => { enableStreamerMode = !enableStreamerMode; toggleStreamerMode();    }));
+
 
         //Still Field Testing
-        menuContainer.appendChild(createCheckbox('Show Member Only (beta)',             'enhancer-show-member-only',      () => { showMemberOnly     = !showMemberOnly;     toggleMemberOnly();      }));
-        menuContainer.appendChild(createCheckbox('Enable Streamer Mode',                'enhancer-enable-streamer-mode',  () => { enableStreamerMode = !enableStreamerMode; toggleStreamerMode();    }));
-        menuContainer.appendChild(createCheckbox('Show New To You Message (beta)',      'enhancer-show-new-to-you',       () => { showNewToYou       = !showNewToYou;       startItemChecks();       }));
-        menuContainer.appendChild(createCheckbox('Enable More Videos Per Row (beta)',   'enhancer-more-videos-per-row',   () => { moreVideosPerRow   = !moreVideosPerRow;   checkItemsPerRow();      }));
+        menuContainer.appendChild(createCheckbox('Show Member Only (beta)',             'enhancer-show-member-only',      () => { showMemberOnly     = !showMemberOnly;     startItemBadgeChecks();  }));
 
 
 
-
+        /*untested*/menuContainer.appendChild(createCheckbox('Show New To You Message (alpha)',      'enhancer-show-new-to-you',       () => { showNewToYou       = !showNewToYou;       startItemChecks();      }));
+        /*untested*/menuContainer.appendChild(createCheckbox('Show Posts (alpha)',                   'enhancer-show-posts',            () => { showPosts          = !showPosts;          startShelfChecks();     }));
 
 
       //menuContainer.appendChild(createCheckbox('Show New',                    'enhancer-show-new',         () => { showNew          = !showNew;          toggleNew();               }));
@@ -650,6 +565,7 @@
 
     function waitForBody() {
         if (document.body) {
+            console.log("script started");
             createMenu();
             startObservers();
         }
