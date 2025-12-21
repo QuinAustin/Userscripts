@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Toggles
 // @namespace    Violentmonkey Scripts
-// @version      1.0.4
+// @version      1.0.5
 // @description  Allows disabling a variety of YouTube features
 // @author       -
 // @match        https://www.youtube.com/*
@@ -15,55 +15,19 @@
 
 
 
-/*changelog 1.3
-
-
-    *New feature
-        -Now able to have more videos per row. Number of videos increases by 1 for each level of zoom out.
-        -Testing a feature to remove the "new to you" prompts that take up a video's location (this happens on the homepage, and is different from the ai prompt)
-
-
-    *Starting to combine different toggle functions into a single function based on their similar queries
-        -this should start to help with performance and memory consumption
-
-    *Streamer Mode is now the first observer function called, therefore hopefully removing potentially sensitive information faster.
-
-    *Mouse pointer now shows when hovering over the Enhancer Menu checkbox, instead of the label text
-
-
-changelog 1.4
-
-=============
-    DONE
-=============
-
-        when watching videos
-            -Toggle Free Movies now removes from the left recommendation
-
-        debug mode now available to help with some errors
-
-        Toggle to remove the
-            - "Explore More Topics" section
-            - "Latest YouTube Posts" section
-
-        Now removes the 'is-in-first-column' attribute from videos, this fixes the gaps seen in between rows of videos
-        Now removes shelfs from the section container instead, this also fixes the gaps seen in between rows of videos
-
-        Badge checks are finally in their own function, might get merged later with the item checks
-
-        Now checks the current URL to know if the user is on the homepage or watching a video. This allows for less useless function calls
-        There is now "Script Started" at start up logged in the console
-
-        Functions that had a lot of repeatable if statements now have switch-cases, and some were made switch-cases as they are going to have more cases in the future.
+/*
 
 
 
-=============
-    TODO
-=============
+Changelog 1.0.5
+    -more videos changed to Enable Zoom Out (more videos)
+    -zooming out now scales shorts down with videos
+    -zooming out now scales font size up, so you can still read titles
+    -new menu made! it looks the exact same, but written way better
+    -badge checking is slowly getting better, and should be getting better at adapting for any new badge rollouts
+    -something I forgot (probably)
 
-    *New Features
-        -Get Toggle Members to work (can be difficult when they don't get recommended as much to me anymore)
+
 */
 
 (function() {
@@ -234,11 +198,27 @@ changelog 1.4
             if (debugMode) {
                 console.log("container:", {container});
             }
+        }catch(e){}
 
+
+
+
+
+        try {
             if (container) {
+
+                //Check For Shelfs
+                container.querySelectorAll('ytd-reel-shelf-renderer').forEach(query => {
+                    const title = query.querySelector('#title')?.textContent.trim().toLowerCase();
+                    if (title === "shorts") {
+                        query.style.display = showShorts ? '' : 'none';
+                    }
+                });
+
+                //Badge Checks
                 container.querySelectorAll('ytd-compact-movie-renderer').forEach(query => {
 
-                    const badgeTextAll   = query.querySelectorAll('.yt-badge-shape__text');
+                    const badgeTextAll  = query.querySelectorAll('.yt-badge-shape__text');
                     const badgeIcon     = query.querySelector('.yt-badge-shape__icon'); //this badge appears to the left of the duration
                     const badgeRenderer = query.querySelector('ytd-badge-supported-renderer p');
 
@@ -314,16 +294,24 @@ changelog 1.4
         container = document.getElementById('contents');
             if (container) {
                 container.querySelectorAll('ytd-rich-item-renderer').forEach(query => {
-
-                    const badgeText     = query.querySelector('.yt-badge-shape__text')?.textContent.trim().toLowerCase();
-                    const badgeText2    = query.querySelectorAll('.yt-badge-shape__text')[2]?.textContent.trim().toLowerCase();
+                    const badgeTextAll  = query.querySelectorAll('.yt-badge-shape__text');
                     const badgeIcon     = query.querySelector('.yt-badge-shape__icon'); //this badge appears to the left of the duration
                     const badgeRenderer = query.querySelector('ytd-badge-supported-renderer p');
+                    let iconPathStart = "xx";
 
+                    if (badgeIcon !== null) {
+                        try {
+                            iconPathStart = badgeIcon.querySelector('path').getAttribute('d').substring(0,2);
+
+                        } catch(e){}
+                    }
 
                     if (debugMode) {
-                        console.log('badgeText: ', badgeText);
-                        console.log('badgeText2: ', badgeText2);
+                        console.log('badgeTextAll: ', {badgeTextAll});
+                        console.log('badgeTextAll[0]: ', badgeTextAll[0]?.textContent.trim().toLowerCase());
+                        console.log('badgeTextAll[1]: ', badgeTextAll[1]?.textContent.trim().toLowerCase());
+                        console.log('badgeTextAll[2]: ', badgeTextAll[1]?.textContent.trim().toLowerCase());
+
                         console.log('badgeIcon: ', badgeIcon);
                         console.log('badgeRenderer: ', badgeRenderer);
                     }
@@ -331,24 +319,23 @@ changelog 1.4
 
 
 
-                    switch (badgeText) {
+                    switch (badgeTextAll[0]?.textContent.trim().toLowerCase()) {  //mix: M3 3.657v16.689a1 1 0 001.466.883L8 19.369V4.632l-3.534-1.86A1 1 0 003 3.657ZM14 7.79l-4-2.105v12.631l4-2.106V7.79ZM22 12l-6-3.157v6.315L22 12Z
                         case 'mix':
                             query.style.display = showMusic ? '' : 'none';
                     }
 
-                    switch (badgeText2) {
+                    switch (badgeTextAll[2]?.textContent.trim().toLowerCase()) {
                         case 'members only':
                             query.style.display = showMemberOnly ? '' : 'none';
 
                         case 'free':
                             query.style.display = showFreeMovies ? '' : 'none';
                     }
-                    try {
-                        switch (badgeIcon) {
-                            case ( badgeIcon.querySelector('path').getAttribute('d').startsWith("M5") ):
-                                query.style.display = showMusic ? '' : 'none';
-                        }
-                    } catch(e) {}
+
+                    switch (iconPathStart) { //note: M5.5 1.383V6.88a2.25 2.25 0 101 1.871V4.6l2.743 1.647a.5.5 0 00.757-.43V3.485a.5.5 0 00-.243-.429l-3.5-2.1a.5.5 0 00-.757.427Z
+                        case ('M5'):
+                            query.style.display = showMusic ? '' : 'none';
+                    }
 
                     switch(badgeRenderer) {
                         case 'purchased':
@@ -406,6 +393,12 @@ changelog 1.4
                 if (container) {
                     container.style.setProperty('--ytd-rich-grid-items-per-row', (base+difference));
                 }
+                const container2 = document.querySelector('ytd-rich-shelf-renderer');
+                if (container2) {
+                    container2.style.setProperty('--ytd-rich-grid-items-per-row', ((base+3)+difference));
+                }
+                document.documentElement.style.fontSize = (10 + difference) + "px";
+
             }
         }
     }
@@ -448,45 +441,57 @@ changelog 1.4
 
 
 
-    function createMenu() {
+
+
+    function clicked(button, menu) {
+        console.log("boop: ", button);
+
+        //button.innerHTML = "changed"; this worked
+
+        const rect = button.getBoundingClientRect();
+        menu.style.top = rect.bottom + 5 + 'px';
+        menu.style.left = rect.left + 'px';
+        menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
+
+    }
+
+
+    function createMenuButton() {
         const voiceSearchButton = document.querySelector('#voice-search-button');
-        if (!voiceSearchButton) return;
 
-        const menuButton = document.createElement('yt-button');
-        menuButton.className             = 'yt-spec-button-shape-next--size-m';
-        menuButton.textContent           = 'Enhancer Menu';
-        menuButton.style.cursor          = 'pointer';
-        menuButton.style.marginLeft      = '10px';
-        menuButton.style.backgroundColor = 'rgba(255,255,255,0.1)';
-        menuButton.style.color           = '#f1f1f1';
-        menuButton.style.padding         = '6px 16px';
-        menuButton.style.borderRadius    = '9999px';
-        menuButton.style.height          = '32px';
-        menuButton.style.minWidth        = 'auto';
-        menuButton.style.fontSize        = '14px';
-        menuButton.style.fontWeight      = '500';
-        menuButton.style.display         = 'inline-flex';
-        menuButton.style.alignItems      = 'center';
-        menuButton.style.justifyContent  = 'center';
+        let button = document.createElement('button'), btnStyle = button.style;
+        button.className = "yt-spec-button-shape-next yt-spec-button-shape-next--tonal yt-spec-button-shape-next--overlay yt-spec-button-shape-next--size-m yt-spec-button-shape-next--icon-leading yt-spec-button-shape-next--enable-backdrop-filter-experiment"
+        button.style.flex = 'revert';
+        button.style.margin = '12px';
 
-        menuButton.addEventListener('mouseenter', () => { menuButton.style.backgroundColor = 'rgba(255,255,255,0.15)'; });
-        menuButton.addEventListener('mouseleave', () => { menuButton.style.backgroundColor = 'rgba(255,255,255,0.1)'; });
-        menuButton.addEventListener('mousedown',  () => { menuButton.style.transform       = 'scale(0.95)'; });
-        menuButton.addEventListener('mouseup',    () => { menuButton.style.transform       = 'scale(1)'; });
 
+        document.querySelector('#voice-search-button').appendChild(button);
+        button.innerHTML = "YTT Menu";
+
+
+        let menu = createMenu();
+        button.onclick = function() {clicked(button, menu)};
+
+        voiceSearchButton.parentElement.appendChild(button);
+    }
+
+
+    function createMenu() {
+        //font-size: 10px;font-family: Roboto, Arial, sans-serif;
         const menuContainer = document.createElement('div');
-        menuContainer.style.position =        'fixed';
+        menuContainer.style.position        = 'fixed';
         menuContainer.style.backgroundColor = '#222';
-        menuContainer.style.color =           '#fff';
-        menuContainer.style.padding =         '10px';
-        menuContainer.style.display =         'none';
-        menuContainer.style.zIndex =          '9999';
-        menuContainer.style.border =          '1px solid #555';
-        menuContainer.style.boxShadow =       '0 2px 10px rgba(0,0,0,0.5)';
-        menuContainer.style.whiteSpace =      'nowrap';
-        menuContainer.style.flexDirection =   'column';
-        menuContainer.style.gap =             '5px';
-        menuContainer.style.borderRadius =    '4px';
+        menuContainer.style.color           = '#fff';
+        menuContainer.style.padding         = '10px';
+        menuContainer.style.display         = 'none';
+        menuContainer.style.zIndex          = '9999';
+        menuContainer.style.border          = '1px solid #555';
+        menuContainer.style.boxShadow       = '0 2px 10px rgba(0,0,0,0.5)';
+        menuContainer.style.whiteSpace      = 'nowrap';
+        menuContainer.style.flexDirection   = 'column';
+        menuContainer.style.gap             = '5px';
+        menuContainer.style.borderRadius    = '4px';
+
 
         const createCheckbox = (labelText, settingKey, onChange) => {
             const wrapper = document.createElement('div');
@@ -515,17 +520,20 @@ changelog 1.4
         };
 
         //Toggle Menu Options
-        menuContainer.appendChild(createCheckbox('Debug Mode',                          'enhancer-debug-mode',            () => { debugMode          = !debugMode;                                                      }));
+        menuContainer.appendChild(createCheckbox('Debug Mode',                          'enhancer-debug-mode',            () => { debugMode          = !debugMode;                                      }));
+        menuContainer.appendChild(createCheckbox('Log Metadata',                        'enhancer-logging',               () => { enableLogging      = !enableLogging;      processVideos();            }));
+        menuContainer.appendChild(createCheckbox('Enable Streamer Mode',                'enhancer-enable-streamer-mode',  () => { enableStreamerMode = !enableStreamerMode; toggleStreamerMode();       }));
+        menuContainer.appendChild(createCheckbox('Enable Zoom Out (more videos)',       'enhancer-more-videos-per-row',   () => { moreVideosPerRow   = !moreVideosPerRow;   checkItemsPerRow();         }));
 
 
-        menuContainer.appendChild(createCheckbox('Log Metadata',                        'enhancer-logging',                         () => { enableLogging           = !enableLogging;           processVideos();        }));
+        menuContainer.appendChild(createCheckbox('Show Watched Videos',                  'enhancer-show-watched',                    () => { showWatched             = !showWatched;             processVideos();        }));
 
 
-        menuContainer.appendChild(createCheckbox('Show Watched Videos',                 'enhancer-show-watched',                    () => { showWatched             = !showWatched;             processVideos();        }));
-        menuContainer.appendChild(createCheckbox('Show Breaking News',                  'enhancer-breaking-news',                   () => { showBreakingNews        = !showBreakingNews;        startShelfChecks();     }));
-        menuContainer.appendChild(createCheckbox('Show Shorts',                         'enhancer-show-shorts',                     () => { showShorts              = !showShorts;              startShelfChecks()      }));
-        menuContainer.appendChild(createCheckbox('Show Games',                          'enhancer-show-games',                      () => { showGames               = !showGames;               startShelfChecks();     }));
-        /*untested*/menuContainer.appendChild(createCheckbox('Show Explore More Topics',            'enhancer-show-explore-more-topics',        () => { showExploreMoreTopics   = !showExploreMoreTopics;   startShelfChecks();     }));
+        menuContainer.appendChild(createCheckbox('Show Breaking News',                   'enhancer-breaking-news',                   () => { showBreakingNews        = !showBreakingNews;        startShelfChecks();     }));
+        menuContainer.appendChild(createCheckbox('Show Shorts',                          'enhancer-show-shorts',                     () => { showShorts              = !showShorts;              startShelfChecks();     }));
+        menuContainer.appendChild(createCheckbox('Show Games',                           'enhancer-show-games',                      () => { showGames               = !showGames;               startShelfChecks();     }));
+        menuContainer.appendChild(createCheckbox('Show Posts',                           'enhancer-show-posts',                      () => { showPosts               = !showPosts;               startShelfChecks();     }));
+        /*untested*/menuContainer.appendChild(createCheckbox('Show Explore More Topics', 'enhancer-show-explore-more-topics',        () => { showExploreMoreTopics   = !showExploreMoreTopics;   startShelfChecks();     }));
 
 
         menuContainer.appendChild(createCheckbox('Show AI',                             'enhancer-show-ai',               () => { showAI             = !showAI;           startItemChecks();startVideoChecks();         }));
@@ -535,38 +543,25 @@ changelog 1.4
         menuContainer.appendChild(createCheckbox('Show Free Movies',                    'enhancer-show-free-movies',      () => { showFreeMovies     = !showFreeMovies;   startItemBadgeChecks();startVideoChecks();    }));
         menuContainer.appendChild(createCheckbox('Show Banner',                         'enhancer-show-banner',           () => { showBanner         = !showBanner;       toggleBanner();                               }));
 
-        //Still Making Tweaks
-        menuContainer.appendChild(createCheckbox('Show More Videos Per Row',            'enhancer-more-videos-per-row',   () => { moreVideosPerRow   = !moreVideosPerRow;   checkItemsPerRow();      }));
-        menuContainer.appendChild(createCheckbox('Enable Streamer Mode',                'enhancer-enable-streamer-mode',  () => { enableStreamerMode = !enableStreamerMode; toggleStreamerMode();    }));
-
 
         //Still Field Testing
-        menuContainer.appendChild(createCheckbox('Show Member Only (beta)',             'enhancer-show-member-only',      () => { showMemberOnly     = !showMemberOnly;     startItemBadgeChecks();  }));
-
-
-
+        /*badgeTextAll[1? and 2?]*/menuContainer.appendChild(createCheckbox('Show Member Only (alpha)',             'enhancer-show-member-only',      () => { showMemberOnly     = !showMemberOnly;     startItemBadgeChecks();  }));
         /*untested*/menuContainer.appendChild(createCheckbox('Show New To You Message (alpha)',      'enhancer-show-new-to-you',       () => { showNewToYou       = !showNewToYou;       startItemChecks();      }));
-        /*untested*/menuContainer.appendChild(createCheckbox('Show Posts (alpha)',                   'enhancer-show-posts',            () => { showPosts          = !showPosts;          startShelfChecks();     }));
+
 
 
       //menuContainer.appendChild(createCheckbox('Show New',                    'enhancer-show-new',         () => { showNew          = !showNew;          toggleNew();               }));
 
-        document.body.appendChild(menuContainer);
-        voiceSearchButton.parentElement.appendChild(menuButton);
 
-        menuButton.addEventListener('click', e => {
-            e.stopPropagation();
-            const rect = menuButton.getBoundingClientRect();
-            menuContainer.style.top = rect.bottom + 5 + 'px';
-            menuContainer.style.left = rect.left + 'px';
-            menuContainer.style.display = menuContainer.style.display === 'none' ? 'flex' : 'none';
-        });
+        document.body.appendChild(menuContainer);
+        return menuContainer;
     }
 
     function waitForBody() {
         if (document.body) {
             console.log("script started");
-            createMenu();
+            //createMenu();
+            createMenuButton();
             startObservers();
         }
         else {
