@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Toggles
 // @namespace    Violentmonkey Scripts
-// @version      1.0.5
+// @version      1.0.6
 // @description  Allows disabling a variety of YouTube features
 // @author       -
 // @match        https://www.youtube.com/*
@@ -15,24 +15,35 @@
 
 
 
+
 /*
+Changelog 1.0.6
 
 
 
-Changelog 1.0.5
-    -more videos changed to Enable Zoom Out (more videos)
-    -zooming out now scales shorts down with videos
-    -zooming out now scales font size up, so you can still read titles
-    -new menu made! it looks the exact same, but written way better
-    -badge checking is slowly getting better, and should be getting better at adapting for any new badge rollouts
-    -something I forgot (probably)
+New Additions
+    Better Zoom Toggle is much better now
+        -Video Player & Side Recommendations
+            -Both are now able to take up the whole screen (without theatre mode).
+            -Both are able to scale when zooming out
+        -Font Size scales
+        -Comments scale (except for the like, dislike, and reply button)
+        -Watched videos in recommendation now removed correctly with toggle
+        -Possibly fixed some shelf sections on the homepage not being identified and removed propery (YouTube decided to create an alternative title element, instead of the main one that shorts, breaking news, and games uses)
 
+TODO:
 
+    -Cleaning up the better zoom toggle, when it comes to some elements not being scaled properly.
+    -Keeping an eye on the currently hidden and (looks to be) WIP 'ai-companion-button' YouTube added to the 'center' element to the right of the 'search-button-narrow' and 'voice-search-button' elements.
 */
+
+
+
 
 (function() {
     'use strict';
 
+    let prevURL = document.URL
 
     //########################
     //  Descriptions
@@ -82,7 +93,7 @@ Changelog 1.0.5
 
     let enableStreamerMode    = localStorage.getItem('enhancer-enable-streamer-mode') === 'false' ? false : true;
 
-    let moreVideosPerRow      = localStorage.getItem('enchancer-more-videos-per-row') === 'false' ? false : true;
+    let enableBetterZoom      = localStorage.getItem('enhancer-enable-better-zoom') === 'false' ? false : true;
 
     //let new                 = localStorage.getItem('enchancer-new')                 === 'false' ? false : true;
 
@@ -112,9 +123,11 @@ Changelog 1.0.5
         if (container) {
             container.querySelectorAll('ytd-rich-section-renderer').forEach(query => {
                 const title = query.querySelector('#title')?.textContent.trim().toLowerCase();
+                const title2 = query.querySelector('.yt-shelf-header-layout__title')?.textContent.trim().toLowerCase();
 
                 if(debugMode) {
                     console.log("title: ",title);
+                    console.log("title2: ",title2);
                 }
 
                 switch (title) {
@@ -137,6 +150,7 @@ Changelog 1.0.5
                         if(debugMode) {
                             console.log("title not recognized: ",title);
                         }
+
                 }
             });
         }
@@ -186,6 +200,78 @@ Changelog 1.0.5
         //Movies: 'ytd-compact-movie-renderer'
 
 
+        //Better Zoom
+
+        if (enableBetterZoom) {
+            try {
+
+
+                //removes empty side borders
+                const columns = document.querySelector('#columns');
+                columns.style.setProperty('--ytd-watch-flexy-sidebar-width', 'intitial');
+
+
+
+
+
+                let zoom = Math.round(window.devicePixelRatio * 100);
+
+                let difference = ((100 - zoom)/10)*3;
+                if (difference >= 0) {
+
+                    //main document font size
+                    document.documentElement.style.fontSize = (10 + difference) + "px";
+
+
+
+                    //comment font size
+                    document.querySelectorAll('.yt-spec-button-shape-next--size-m').forEach(query => {
+                        query.style.setProperty('font-size', ( ( 14 + difference ) + "px" ));
+                    });
+
+                    //video recommendation thumbnail size
+                    document.querySelectorAll('.yt-lockup-view-model__content-image').forEach(query => {
+                        query.style.setProperty('width', ( ( 168 + (difference*10 ) ) + "px" ));
+                    });
+
+
+                    const comments = document.querySelector('ytd-comment-thread-renderer').parentElement;
+
+                    //comment author pngs size
+                    comments.querySelectorAll('yt-img-shadow').forEach(query => {
+                        query.style.setProperty('width', ( ( 40 + difference ) + "px" ));
+                        query.style.setProperty('height', ( ( 40 + difference ) + "px" ));
+                    });
+
+                    //comment emoji size
+                    comments.querySelectorAll('#main img').forEach(query => {
+                        query.style.setProperty('width', ( ( 14 + difference ) + "px" ));
+                        query.style.setProperty('height', ( ( 14 + difference ) + "px" ));
+                    });
+
+
+                    document.querySelectorAll('yt-sub-thread').forEach(query => {
+                        query.childNodes[0].style.setProperty('width', ( ( 36 + difference + 2 ) + "px" ));
+                    })
+                }
+            } catch(e){}
+
+        }
+        else {
+            try {
+                columns.style.setProperty('--ytd-watch-flexy-sidebar-width', '402px');
+            } catch(e){}
+        }
+
+
+
+     //   trd-watch-flexy.attribute(--ytd-watch-flexy-max-player-width-wide-screen = '100%');
+     //   const playerContainer = document.getElementById('movie_player');
+     //   playerContainer.style.
+
+
+
+
         //AI Summary Under Video Players
         try {
             const aiSummary = document.getElementById('expandable-metadata');
@@ -193,26 +279,55 @@ Changelog 1.0.5
         } catch(e) {}
 
 
+        //try {
+        //    let container = document.querySelector('#secondary #secondary-inner #related #items ytd-item-section-renderer #contents');
+        //
+        //    if (debugMode) {
+        //        console.log("container:", {container});
+        //    }
+        //}catch(e){}
+        let container;
         try {
-            const container = document.querySelector('#secondary #secondary-inner #related #items ytd-item-section-renderer #contents');
-            if (debugMode) {
-                console.log("container:", {container});
-            }
-        }catch(e){}
-
-
-
-
+            container = (document.querySelector('yt-lockup-view-model').parentElement);
+        } catch(e){}
 
         try {
             if (container) {
+
+
+                //Normal Video Checks
+
+                //hidden one: <div id="contents" class="style-scope ytd-rich-grid-renderer">
+                    //<ytd-rich-item-renderer class="style-scope ytd-rich-grid-renderer" items-per-row="3" lockup="true" rendered-from-rich-grid=""></ytd-rich-item-renderer>
+
+
+                //real one:   <div id="contents" class=" style-scope ytd-item-section-renderer style-scope ytd-item-section-renderer">
+                    //<yt-lockup-view-model class="ytd-item-section-renderer lockup yt-lockup-view-model--wrapper"></yt-lockup-view-model>
+
+
+
+
+                container.querySelectorAll('yt-lockup-view-model').forEach(query => {
+                    const progressSegment = query.querySelector('.ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment');
+                    let watchedPercent = progressSegment ? parseFloat(progressSegment.style.width) || 0 : 0;
+
+                    if (debugMode) {
+                        console.log("video: ",query, "watchedPercent: ", watchedPercent);
+                    }
+
+                    if (watchedPercent === 100) {
+                        query.style.display = showWatched ? '' : 'none';
+                    }
+                });
+
+
 
                 //Check For Shelfs
                 container.querySelectorAll('ytd-reel-shelf-renderer').forEach(query => {
                     const title = query.querySelector('#title')?.textContent.trim().toLowerCase();
                     if (title === "shorts") {
                         query.style.display = showShorts ? '' : 'none';
-                    }
+                    } else { console.log(title); }
                 });
 
                 //Badge Checks
@@ -384,7 +499,7 @@ Changelog 1.0.5
 
 
     function checkItemsPerRow() {
-        if (moreVideosPerRow) {
+        if (enableBetterZoom) {
             let zoom = Math.round(window.devicePixelRatio * 100);
             const base = 3;
             let difference = (100 - zoom)/10;
@@ -397,7 +512,7 @@ Changelog 1.0.5
                 if (container2) {
                     container2.style.setProperty('--ytd-rich-grid-items-per-row', ((base+3)+difference));
                 }
-                document.documentElement.style.fontSize = (10 + difference) + "px";
+                document.documentElement.style.fontSize = (10 + difference*2) + "px";
 
             }
         }
@@ -417,14 +532,17 @@ Changelog 1.0.5
 
     function startObservers() {
         const observer = new MutationObserver(() => {
-
+            let currentURL = document.URL;
             toggleStreamerMode();
 
-            let currentURL = document.URL;
+
 
             if (currentURL === "https://www.youtube.com/") {
+                if (debugMode && (currentURL !== prevURL)) {
+                    console.log("On Home Page");
+                }
                 toggleBanner();
-                dcheckItemsPerRow();
+                checkItemsPerRow();//dcheckItemsPerRow();
                 processVideos();
                 startShelfChecks();
                 startItemChecks();
@@ -432,8 +550,14 @@ Changelog 1.0.5
             }
 
             else if (currentURL.startsWith("https://www.youtube.com/watch?v=")) {
+                if (debugMode && (currentURL !== prevURL)) {
+                    console.log("On Watch Page");
+                }
                 startVideoChecks();
             }
+
+
+            prevURL = currentURL; //global
         });
         observer.observe(document.body, { childList: true, subtree: true });
     }
@@ -459,7 +583,7 @@ Changelog 1.0.5
     function createMenuButton() {
         const voiceSearchButton = document.querySelector('#voice-search-button');
 
-        let button = document.createElement('button'), btnStyle = button.style;
+        let button = document.createElement('yttbutton'), btnStyle = button.style;
         button.className = "yt-spec-button-shape-next yt-spec-button-shape-next--tonal yt-spec-button-shape-next--overlay yt-spec-button-shape-next--size-m yt-spec-button-shape-next--icon-leading yt-spec-button-shape-next--enable-backdrop-filter-experiment"
         button.style.flex = 'revert';
         button.style.margin = '12px';
@@ -520,28 +644,29 @@ Changelog 1.0.5
         };
 
         //Toggle Menu Options
-        menuContainer.appendChild(createCheckbox('Debug Mode',                          'enhancer-debug-mode',            () => { debugMode          = !debugMode;                                      }));
-        menuContainer.appendChild(createCheckbox('Log Metadata',                        'enhancer-logging',               () => { enableLogging      = !enableLogging;      processVideos();            }));
-        menuContainer.appendChild(createCheckbox('Enable Streamer Mode',                'enhancer-enable-streamer-mode',  () => { enableStreamerMode = !enableStreamerMode; toggleStreamerMode();       }));
-        menuContainer.appendChild(createCheckbox('Enable Zoom Out (more videos)',       'enhancer-more-videos-per-row',   () => { moreVideosPerRow   = !moreVideosPerRow;   checkItemsPerRow();         }));
+        menuContainer.appendChild(createCheckbox('Debug Mode',                              'enhancer-debug-mode',                      () => { debugMode               = !debugMode;                                                           }));
+
+        menuContainer.appendChild(createCheckbox('Log Metadata',                            'enhancer-logging',                         () => { enableLogging           = !enableLogging;           processVideos();                            }));
+        menuContainer.appendChild(createCheckbox('Enable Streamer Mode',                    'enhancer-enable-streamer-mode',            () => { enableStreamerMode      = !enableStreamerMode;      toggleStreamerMode();                       }));
+        menuContainer.appendChild(createCheckbox('Enable Better Zoom',                      'enhancer-enable-better-zoom',              () => { enableBetterZoom        = !enableBetterZoom;        checkItemsPerRow();startVideoChecks();      }));
 
 
-        menuContainer.appendChild(createCheckbox('Show Watched Videos',                  'enhancer-show-watched',                    () => { showWatched             = !showWatched;             processVideos();        }));
+        menuContainer.appendChild(createCheckbox('Show Watched Videos',                     'enhancer-show-watched',                    () => { showWatched             = !showWatched;             processVideos();startVideoChecks();         }));
 
 
-        menuContainer.appendChild(createCheckbox('Show Breaking News',                   'enhancer-breaking-news',                   () => { showBreakingNews        = !showBreakingNews;        startShelfChecks();     }));
-        menuContainer.appendChild(createCheckbox('Show Shorts',                          'enhancer-show-shorts',                     () => { showShorts              = !showShorts;              startShelfChecks();     }));
-        menuContainer.appendChild(createCheckbox('Show Games',                           'enhancer-show-games',                      () => { showGames               = !showGames;               startShelfChecks();     }));
-        menuContainer.appendChild(createCheckbox('Show Posts',                           'enhancer-show-posts',                      () => { showPosts               = !showPosts;               startShelfChecks();     }));
-        /*untested*/menuContainer.appendChild(createCheckbox('Show Explore More Topics', 'enhancer-show-explore-more-topics',        () => { showExploreMoreTopics   = !showExploreMoreTopics;   startShelfChecks();     }));
+        menuContainer.appendChild(createCheckbox('Show Breaking News',                      'enhancer-breaking-news',                   () => { showBreakingNews        = !showBreakingNews;        startShelfChecks();                         }));
+        menuContainer.appendChild(createCheckbox('Show Shorts',                             'enhancer-show-shorts',                     () => { showShorts              = !showShorts;              startShelfChecks();                         }));
+        menuContainer.appendChild(createCheckbox('Show Games',                              'enhancer-show-games',                      () => { showGames               = !showGames;               startShelfChecks();                         }));
+        menuContainer.appendChild(createCheckbox('Show Posts',                              'enhancer-show-posts',                      () => { showPosts               = !showPosts;               startShelfChecks();                         }));
+        /*untested*/menuContainer.appendChild(createCheckbox('Show Explore More Topics',    'enhancer-show-explore-more-topics',        () => { showExploreMoreTopics   = !showExploreMoreTopics;   startShelfChecks();                         }));
 
 
-        menuContainer.appendChild(createCheckbox('Show AI',                             'enhancer-show-ai',               () => { showAI             = !showAI;           startItemChecks();startVideoChecks();         }));
-        menuContainer.appendChild(createCheckbox('Show Playlists and Podcasts',         'enhancer-show-playlists',        () => { showPlaylists      = !showPlaylists;    startItemChecks();                            }));
-        menuContainer.appendChild(createCheckbox('Show Purchased Videos',               'enhancer-show-purchased',        () => { showPurchased      = !showPurchased;    startItemBadgeChecks();                       }));
-        menuContainer.appendChild(createCheckbox('Show Music',                          'enhancer-show-music',            () => { showMusic          = !showMusic;        startItemBadgeChecks();                       }));
-        menuContainer.appendChild(createCheckbox('Show Free Movies',                    'enhancer-show-free-movies',      () => { showFreeMovies     = !showFreeMovies;   startItemBadgeChecks();startVideoChecks();    }));
-        menuContainer.appendChild(createCheckbox('Show Banner',                         'enhancer-show-banner',           () => { showBanner         = !showBanner;       toggleBanner();                               }));
+        menuContainer.appendChild(createCheckbox('Show AI',                                 'enhancer-show-ai',                         () => { showAI                  = !showAI;                  startItemChecks();startVideoChecks();       }));
+        menuContainer.appendChild(createCheckbox('Show Playlists and Podcasts',             'enhancer-show-playlists',                  () => { showPlaylists           = !showPlaylists;           startItemChecks();                          }));
+        menuContainer.appendChild(createCheckbox('Show Purchased Videos',                   'enhancer-show-purchased',                  () => { showPurchased           = !showPurchased;           startItemBadgeChecks();                     }));
+        menuContainer.appendChild(createCheckbox('Show Music',                              'enhancer-show-music',                      () => { showMusic               = !showMusic;               startItemBadgeChecks();                     }));
+        menuContainer.appendChild(createCheckbox('Show Free Movies',                        'enhancer-show-free-movies',                () => { showFreeMovies          = !showFreeMovies;          startItemBadgeChecks();startVideoChecks();  }));
+        menuContainer.appendChild(createCheckbox('Show Banner',                             'enhancer-show-banner',                     () => { showBanner              = !showBanner;              toggleBanner();                             }));
 
 
         //Still Field Testing
@@ -560,9 +685,13 @@ Changelog 1.0.5
     function waitForBody() {
         if (document.body) {
             console.log("script started");
-            //createMenu();
-            createMenuButton();
-            startObservers();
+            //checks to make sure extension did not get restarted, as this creates a duplicate button
+            if (document.querySelector('yttbutton') === null) {
+                console.log("creating ytt button");
+                createMenuButton();
+                startObservers();
+            }
+
         }
         else {
             setTimeout(waitForBody, 50);
