@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Toggles
 // @namespace    Violentmonkey Scripts
-// @version      1.0.6
+// @version      1.0.7
 // @description  Allows disabling a variety of YouTube features
 // @author       -
 // @match        https://www.youtube.com/*
@@ -17,25 +17,19 @@
 
 
 /*
-Changelog 1.0.6
+Changelog 1.0.7 
+    -toggles that call two functions (one for homepage, one for watchpage), now only call one based on the current document.url returned
 
+    -functions now check a getContents() function to get the correct 'contents' element.
+        this was previously breaking some functions from working, after being redirected from a different url, as it would keep the previous urls 'contents' up top.
+         but the program was only ever checking for the first 'contents', so it was parsing the wrong container.
 
+    -a few more debug logs added
 
-New Additions
-    Better Zoom Toggle is much better now
-        -Video Player & Side Recommendations
-            -Both are now able to take up the whole screen (without theatre mode).
-            -Both are able to scale when zooming out
-        -Font Size scales
-        -Comments scale (except for the like, dislike, and reply button)
-        -Watched videos in recommendation now removed correctly with toggle
-        -Possibly fixed some shelf sections on the homepage not being identified and removed propery (YouTube decided to create an alternative title element, instead of the main one that shorts, breaking news, and games uses)
-
-TODO:
-
-    -Cleaning up the better zoom toggle, when it comes to some elements not being scaled properly.
-    -Keeping an eye on the currently hidden and (looks to be) WIP 'ai-companion-button' YouTube added to the 'center' element to the right of the 'search-button-narrow' and 'voice-search-button' elements.
+    -some of the important functions now retry until they are executed correctly (i.e. menu button and streamer mode);
+        *fixed a bug where the menu button was not being loaded correctly, and it would create empty buttons
 */
+
 
 
 
@@ -98,10 +92,34 @@ TODO:
     //let new                 = localStorage.getItem('enchancer-new')                 === 'false' ? false : true;
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+    /*
+    HELPER FUNCTIONS
+    */
+
     function toggleQuerySelector(selector, enabled) {
         try {
             const element = document.querySelector(selector);
             element.style.display = enabled;
+        } catch(e) {}
+    }
+    function toggleQuerySelectorAll(selector, enabled) {
+        try {
+            document.querySelectorAll(selector).forEach(query => {
+                query.style.display = enabled;
+            });
+
         } catch(e) {}
     }
 
@@ -113,61 +131,117 @@ TODO:
         } catch(e) {}
     }
 
+    function setElementProperty(ele, property, propertyValue, propertyType) {
+        ele.style.setProperty(property, ( propertyValue + propertyType ));
+    }
 
-
-
-    function startShelfChecks() {
-          //console.log("starting shelf checks");
-
-        const container = document.getElementById('contents');
-        if (container) {
-            container.querySelectorAll('ytd-rich-section-renderer').forEach(query => {
-                const title = query.querySelector('#title')?.textContent.trim().toLowerCase();
-                const title2 = query.querySelector('.yt-shelf-header-layout__title')?.textContent.trim().toLowerCase();
-
-                if(debugMode) {
-                    console.log("title: ",title);
-                    console.log("title2: ",title2);
-                }
-
-                switch (title) {
-                    case 'shorts':
-                        query.style.display = showShorts ? '' : 'none';
-                    break;
-                    case 'youtube playables':
-                        query.style.display = showGames ? '' : 'none';
-                    break;
-                    case 'breaking news':
-                        query.style.display = showBreakingNews ? '' : 'none';
-                    break;
-                    case 'latest youtube posts':
-                        query.style.display = showPosts ? '' : 'none';
-                    break;
-                    case 'explore more topics':
-                        query.style.display = showExploreMoreTopics ? ''  : 'none';
-                    break;
-                    default:
-                        if(debugMode) {
-                            console.log("title not recognized: ",title);
-                        }
-
-                }
-            });
+    function isHomepage() {
+        if (document.URL === "https://www.youtube.com/") {
+            return true;
         }
-        else if (debugMode) {
-            console.log("videos have not been loaded yet");
+        return false;
+    }
+
+    function getContents() { //To solve issues pertaining to redirects
+        try {
+            const url = document.URL
+            if (isHomepage) {
+                return document.querySelector('ytd-rich-item-renderer').parentElement; //video -> redirect to homepage
+            }
+            else if (url.startsWith("https://www.youtube.com/watch?v=" || url === "https://www.youtube.com/?bp=wgUCEAE%3D")) {
+                return document.querySelector('yt-lockup-view-model').parentElement; //homepage -> redirect to video
+            }
+
+        } catch(e) {
+            console.log("exception: (getContents) Failed To Get Page Contents");
+            setTimeout(getContents, 50)
         }
     }
 
 
+    function getZoomOut() {
+        return ((100 - Math.round(window.devicePixelRatio * 100 ) ) / 10); //i.e. 100% returns 0, 90% returns 1, ..., 30% returns 7
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    function startShelfChecks() {
+        try {
+            //const container = document.querySelector('ytd-rich-item-renderer').parentElement
+            const container = getContents();
+            if (debugMode) {
+                console.log("(shelf) container: ", container);
+            }
+
+            //document.querySelector('ytd-rich-item-renderer').parentElement.querySelectorAll('ytd-rich-section-renderer #title')
+            if (container) {
+                container.querySelectorAll('ytd-rich-section-renderer').forEach(query => {
+                    const title = query.querySelector('#title')?.textContent.trim().toLowerCase();
+                    const title2 = query.querySelector('.yt-shelf-header-layout__title')?.textContent.trim().toLowerCase();
+
+
+
+                    switch (title || title2) {
+                        case 'shorts':
+                            query.style.display = showShorts ? '' : 'none';
+                        break;
+                        case 'youtube playables':
+                            query.style.display = showGames ? '' : 'none';
+                        break;
+                        case 'breaking news':
+                            query.style.display = showBreakingNews ? '' : 'none';
+                        break;
+                        case 'latest youtube posts':
+                            query.style.display = showPosts ? '' : 'none';
+                        break;
+                        case 'explore more topics':
+                            query.style.display = showExploreMoreTopics ? ''  : 'none';
+                        break;
+                        default:
+                            if(debugMode) {
+                                console.log("title not recognized: title - ",title, " title2 - ", title2);
+                            }
+                        break;
+                    }
+                });
+            }
+        } //try
+        catch (e) {
+            console.log("(startShelfChecks) exception: Failed To Make Changes To Sections | ", e);
+        }
+    }
+
+
+
     function startItemChecks() {
-        //console.log("starting item checks");
-        const container = document.getElementById('contents');
+        const container = getContents();
         if (container) {
             container.querySelectorAll('ytd-rich-item-renderer').forEach(query => {
 
                 //Playlist, Podcast, Etc. Item
-                const playlistBadge = query.querySelector('.yt-badge-shape__text')?.textContent.trim().toLowerCase();   //this is normally where video duration is placed. example is: <div class="yt-badge-shape__text">51 videos</div>
+                const playlistBadge = query.querySelector('.yt-badge-shape__text')?.textContent.trim().toLowerCase();
                 if (playlistBadge) {
                     if ( playlistBadge.includes('episodes') || playlistBadge.includes('lessons') || playlistBadge.includes('videos') ) {
                         query.style.display = showPlaylists ? '' : 'none';
@@ -181,18 +255,423 @@ TODO:
 
                 //video recommendation prompt that takes over a video spot to say "new to you"
                 const title = query.querySelector('#title')?.textContent.trim().toLowerCase();
-                if (title === 'Looking for something different?') {
-                    query.style.display = showNewToYouPrompt ? '' : 'none';
+                if (title === 'looking for something different?') {
+                    query.style.display = showNewToYou ? '' : 'none';
                 }
 
 
             });
         }
         else if (debugMode) {
-            console.log("videos have not been loaded yet");
+            console.log("(startItemChecks) exception: Failed To Make Changes To Videos | ", e);
         }
     }
 
+
+/* ZOOM SCALE
+                            switch(trueDifference) {
+                                case(0): //100
+                                    break;
+                                case(1): //90
+                                    break;
+                                case(2): //80
+                                    break;
+                                case(3): //70
+                                    break;
+                                case(4): //60
+                                    break;
+                                case(5): //50
+                                    break;
+                                case(6): //40
+                                    break;
+                                case(7): //30
+                                    break;
+                            }
+*/
+    function BetterZoomWatchPageChanges() {
+        try {
+            let zoom = Math.round(window.devicePixelRatio * 100);
+            let trueDifference = ((100 - zoom)/10);
+            let difference = ((100 - zoom)/10)*3;
+
+
+                if (difference >= 0) {
+                    let changeValue = 0;
+
+
+                    try {
+                    /*
+                    MAIN DOCUMENT CHANGES
+                    */
+                        //main document font size
+
+                        document.documentElement.style.fontSize = (10 + difference) + "px";             //document.documentElement.style.fontSize = (10) + "px";
+
+                        //removes empty side borders
+                        const columns = document.querySelector('#columns');
+                        const secondary = columns.querySelector('#secondary');
+
+                        //Resize the divide between primary and secondary columns
+                        setElementProperty(columns, '--ytd-watch-flexy-sidebar-width', 100, "%");                   //setElementProperty(columns, '--ytd-watch-flexy-sidebar-width', 402, "px");
+                        setElementProperty(secondary, '--ytd-watch-flexy-sidebar-width', 30, "%");                  //setElementProperty(secondary, '--ytd-watch-flexy-sidebar-width', 402, "px");
+                        setElementProperty(secondary, '--ytd-watch-flexy-horizontal-page-margin', 32, "px");        //setElementProperty(secondary, '--ytd-watch-flexy-horizontal-page-margin', 16, "px");
+                    } catch(e) {
+                        console.log("(startVideoChecks) exception: Failed To Make Changes To Document");
+                    }
+
+                    try {
+                        /*
+                        RIBBON CHANGES
+                        */
+
+                        //toolbar size
+                        document.getElementById('masthead').style.setProperty('height', (200) + '%');           //document.getElementById('masthead').style.setProperty('height', (100) + '%');
+
+
+                        //toolbar logo size
+
+                            let mainSvgs = document.querySelectorAll('svg'); //'svg' //'ytd-button-renderer'
+                            changeValue = (100+difference*10);
+                            for (let i = 6; i <= 12; i++) {
+                                setElementProperty(mainSvgs[i], 'height', changeValue, "%");
+                                setElementProperty(mainSvgs[i], 'width',  changeValue, "%");
+                            }
+
+
+
+
+                        //fixing logos background bubble
+
+
+                        const container = document.getElementById('voice-search-button').parentNode.parentElement;
+                            const containerCN = container.childNodes;
+                                const start  = containerCN[1];
+                                const center = containerCN[3];
+                                const end    = containerCN[5];
+
+
+
+                        //Container
+                            const background  = document.getElementById('background');
+                            changeValue = (2 + (trueDifference/20)); //default is around 2.35%
+                            setElementProperty(background, 'height', ( 100 + trueDifference*30 ), '%');
+
+
+                            const pageManager = document.getElementById('page-manager');
+
+                            //setElementProperty(pageManager, 'margin-top', 'var(--ytd-masthead-height,var(--ytd-toolbar-height))', '');
+                            if (pageManager.querySelector('ytd-watch-flexy').fullscreenValue) {
+                                setElementProperty(pageManager, 'margin-top', '0', '%');
+                            }
+                            else{
+
+                                switch(trueDifference) {
+                                    case(0): //100
+                                        setElementProperty(pageManager, 'margin-top', 'var(--ytd-masthead-height,var(--ytd-toolbar-height))', '');
+                                        break;
+                                    case(1): //90
+                                        setElementProperty(pageManager, 'margin-top', '2.3%', '');
+                                        break;
+                                    case(2): //80
+                                        setElementProperty(pageManager, 'margin-top', '2.6%', '');
+                                        break;
+                                    case(3): //70
+                                        setElementProperty(pageManager, 'margin-top', '2.8%', '');
+                                        break;
+                                    case(4): //60
+                                        setElementProperty(pageManager, 'margin-top', '2.8%', '');
+                                        break;
+                                    case(5): //50
+                                        setElementProperty(pageManager, 'margin-top', '2.7%', '');
+                                        break;
+                                    case(6): //40
+                                        setElementProperty(pageManager, 'margin-top', '2.4%', '');
+                                        break;
+                                    case(7): //30
+                                        setElementProperty(pageManager, 'margin-top', '2%', '');
+                                        break;
+                                }
+                            }
+
+
+
+
+
+
+
+                        //Start
+                            setElementProperty(start, 'margin-right', '20', '%');
+                            const startCN = start.childNodes;
+                                const guideButton = startCN[5];
+                                const logoIcon    = startCN[8].querySelector('#logo-icon');
+
+                            setElementProperty(guideButton, 'padding-right', (15 + trueDifference*5), '%');
+                            setElementProperty(logoIcon, 'padding-left', (15 + trueDifference*5), '%');
+
+
+
+
+
+                        //Center
+                            setElementProperty(center, 'margin', '10', '%');
+                            //setElementProperty(center, 'margin-left', '10', '%');
+                            //setElementProperty(center, 'margin-right', '10', '%');
+
+                            const centerCN = center.childNodes;
+                            const searchBox         = centerCN[1];
+                            const searchButtton     = centerCN[3];
+                            const voiceSearchButton = centerCN[5];
+                            const aiCompanionButton = centerCN[7];
+                            const YTTMenuButton     = centerCN[9];
+
+                            changeValue = 3 + trueDifference;
+                            setElementProperty(center, 'height', changeValue, '%');
+                            setElementProperty(center, 'width', changeValue, '%');
+                            setElementProperty(center, 'display', 'contents','');
+
+
+
+
+                            //setElementProperty(searchBox, 'margin-top', '10', 'px');
+                            //setElementProperty(searchBox, 'width', 'fit-content', '');
+                            //setElementProperty(searchBox, 'display', 'inline-flex', '');
+
+                            switch(trueDifference) {
+                                case(1):
+                                    //setElementProperty(searchBox, 'margin-top', '10', 'px');
+                                    setElementProperty(searchBox, 'height', (100), '%');
+                                    break;
+                                case(2):
+                                    //setElementProperty(searchBox, 'margin-top', '20', 'px');
+                                    setElementProperty(searchBox, 'height', (120), '%');
+                                    break;
+                                case(3):
+                                    //setElementProperty(searchBox, 'margin-top', '30', 'px');
+                                    setElementProperty(searchBox, 'height', (140), '%');
+                                    break;
+                            }
+
+                            if (difference === 0) {
+                                changeValue = 5.5;
+                            }
+                            else {
+                                changeValue = 5.5 + difference;
+                            }
+
+                            //setElementProperty(voiceSearchButton, 'height', changeValue, "%");
+                            //setElementProperty(voiceSearchButton, 'width', changeValue, "%");
+
+
+
+
+                        //End
+                        setElementProperty(end, 'margin-left', '20', '%');
+
+                    } catch(e) {
+                        console.log("(startVideoChecks) exception: Failed To Make Changes To Ribbon");
+                    }
+
+                    try {
+                    /*
+                    MAIN VIDEO PLAYER
+                    */
+                        //progress bar size
+                        document.querySelector('.ytp-progress-bar-container').style.setProperty('height', ( ( 6 + difference ) + 'px' ));
+
+                    } catch(e) {
+                        console.log("(startVideoChecks) exception: Failed To Make Changes To Main Video Progress Bar");
+                    }
+
+                    try {
+                    /*
+                    COMMENT SECTION
+                    */
+                        //comment font size
+                        changeValue = (14+difference);
+                        document.querySelectorAll('.yt-spec-button-shape-next--size-m').forEach(query => {
+                            query.style.setProperty('font-size', ( (changeValue) + "px" ));
+                        });
+
+                        const comments = document.querySelector('ytd-comment-thread-renderer').parentElement;
+
+                        //comment author pngs size
+                        changeValue = (40+difference);
+                        comments.querySelectorAll('yt-img-shadow').forEach(query => {
+                            query.style.setProperty('width',  ( ( changeValue ) + "px" ));
+                            query.style.setProperty('height', ( ( changeValue ) + "px" ));
+                        });
+
+                        //comment emoji size
+                        changeValue = (14+difference);
+                        comments.querySelectorAll('#main img').forEach(query => {
+                            query.style.setProperty('width', (  ( changeValue ) + "px" ));
+                            query.style.setProperty('height', ( ( changeValue ) + "px" ));
+                        });
+
+                        //fix for the reply thread offset (caused by the script's scaling)
+                        changeValue = (36 + difference + 2);
+                        document.querySelectorAll('yt-sub-thread').forEach(query => {
+                            query.childNodes[0].style.setProperty('width', ( ( changeValue ) + "px" ));
+                        })
+                    }
+                    catch (e) {
+                        if (debugMode) { //Comments Usually Throw Excpeitons Because They Are Not Loaded Yet (Scroll Down To See Them, And The Exception Should Go Away)
+                            console.log("(startVideoChecks) exception: Failed To Make Changes To Comments");
+                        }
+                    }
+
+                    try {
+                    /*
+                    SIDE PANEL VIDEO RECOMMENDATIONS
+                    */
+                        //video recommendation thumbnail size
+                        changeValue = (168 + (difference*10 ))
+                        document.querySelectorAll('.yt-lockup-view-model__content-image').forEach(query => {
+                            query.style.setProperty('width', ( ( changeValue ) + "px" ));
+                        });
+
+                        //stops shorts from being spread out and weird looking
+                        try {
+                            columns.querySelector('ytd-reel-shelf-renderer').style.setProperty('--ytd-reel-item-compact-layout-width', 'initial');
+                        } catch(e) {
+                            if (debugMode) { //This Regularly Happens, Because Shorts Are Not Always Recommended
+                                console.log("(startVideoChecks [Video Recommendation Side Panel]: exception: Failed To Make Chnages To Shorts");
+                            }
+                        }
+                    } catch(e) {
+                        if (debugMode) { //Exception From Missing Shorts Section Gets Caught Here
+                            console.log("(startVideoChecks): exception: Failed To Make Changes To Video Recommendation Side Panel");
+                        }
+                    }
+
+                }
+                else if (difference >= 0) {
+                    const background  = document.getElementById('background');
+                    changeValue = (2 + (trueDifference/20)); //default is around 2.35%
+                    setElementProperty(background, 'height', ( 100 + trueDifference*30 ), '%');
+                }
+            }
+        catch(e){
+            console.log("(startVideoChecks) exception: Failed To Make Changes To Watch Page", e);
+        }
+    }
+
+
+    function BetterZoomWatchPageReset() {
+                    try {
+                    /*
+                    RESET MAIN DOCUMENT CHANGES
+                    */
+                        //Reset main document font size
+                        document.documentElement.style.fontSize = (10) + "px";
+
+                        //Reset to empty side borders
+                        const columns = document.querySelector('#columns');
+                        const secondary = columns.querySelector('#secondary');
+
+                        //Reset the divide between primary and secondary columns
+                        setElementProperty(columns, '--ytd-watch-flexy-sidebar-width', 402, "px");
+                        setElementProperty(secondary, '--ytd-watch-flexy-sidebar-width', 402, "px");
+                        setElementProperty(secondary, '--ytd-watch-flexy-horizontal-page-margin', 16, "px");
+                    } catch(e) {
+                        console.log("(startVideoChecks) exception: Failed To Make Changes To Document");
+                    }
+
+
+
+                    try {
+                        /*
+                        RESET RIBBON CHANGES
+                        */
+
+                        //Reset toolbar size
+                        document.getElementById('masthead').style.setProperty('height', (100) + '%');
+
+
+                        //Reset toolbar logo size
+                            let mainSvgs = document.querySelectorAll('svg'); //'svg' //'ytd-button-renderer'
+                            for (let i = 6; i <= 12; i++) {
+                                setElementProperty(mainSvgs[i], 'height', 100, "%");
+                                setElementProperty(mainSvgs[i], 'width',  100, "%");
+                            }
+
+
+                        //Reset fixing logos background bubble
+                        const container = document.getElementById('voice-search-button').parentNode.parentElement;
+                            const containerCN = container.childNodes;
+                                const start  = containerCN[1];
+                                const center = containerCN[3];
+                                const end    = containerCN[5];
+
+
+
+                        //Reset Container
+                            const background  = document.getElementById('background');
+                            setElementProperty(background, 'height', (56), 'px');
+
+                            const pageManager = document.getElementById('page-manager');
+                            setElementProperty(pageManager, 'margin-top', 'var(--ytd-masthead-height,var(--ytd-toolbar-height))', '');
+
+
+
+
+
+
+
+                        //Reset Start
+                            setElementProperty(start, 'margin-right', '', '');
+                            const startCN = start.childNodes;
+                                const guideButton = startCN[5];
+                                const logoIcon    = startCN[8].querySelector('#logo-icon');
+
+                            //setElementProperty(guideButton, 'padding-right', (8), 'px');
+                            setElementProperty(guideButton, 'padding-right', '', '');
+                            setElementProperty(logoIcon,    'padding-left',  '', '');
+
+
+
+
+
+                        //Center
+                            setElementProperty(center, 'margin', '', '');
+                            //setElementProperty(center, 'margin-left', '10', '%');
+                            //setElementProperty(center, 'margin-right', '10', '%');
+
+                            const centerCN = center.childNodes;
+                            const searchBox         = centerCN[1];
+                            const searchButtton     = centerCN[3];
+                            const voiceSearchButton = centerCN[5];
+                            const aiCompanionButton = centerCN[7];
+                            const YTTMenuButton     = centerCN[9];
+
+                            changeValue = 3 + trueDifference;
+                            setElementProperty(center, 'height',  '', '');
+                            setElementProperty(center, 'width',   '', '');
+                            setElementProperty(center, 'display', '', '');
+
+
+                            setElementProperty(searchBox, 'height', '', '');
+
+
+
+                        //End
+                        setElementProperty(end, 'margin-left', '', '');
+
+                    } catch(e) {
+                        console.log("(startVideoChecks) exception: Failed To Make Changes To Ribbon");
+                    }
+
+
+
+
+
+    }
+    function BetterZoomHomePageChanges() {
+
+    }
+    function BetterZoomHomePageReset() {
+
+    }
 
     function startVideoChecks() {
         //Videos: 'yt-lockup-view-model'
@@ -203,71 +682,11 @@ TODO:
         //Better Zoom
 
         if (enableBetterZoom) {
-            try {
-
-
-                //removes empty side borders
-                const columns = document.querySelector('#columns');
-                columns.style.setProperty('--ytd-watch-flexy-sidebar-width', 'intitial');
-
-
-
-
-
-                let zoom = Math.round(window.devicePixelRatio * 100);
-
-                let difference = ((100 - zoom)/10)*3;
-                if (difference >= 0) {
-
-                    //main document font size
-                    document.documentElement.style.fontSize = (10 + difference) + "px";
-
-
-
-                    //comment font size
-                    document.querySelectorAll('.yt-spec-button-shape-next--size-m').forEach(query => {
-                        query.style.setProperty('font-size', ( ( 14 + difference ) + "px" ));
-                    });
-
-                    //video recommendation thumbnail size
-                    document.querySelectorAll('.yt-lockup-view-model__content-image').forEach(query => {
-                        query.style.setProperty('width', ( ( 168 + (difference*10 ) ) + "px" ));
-                    });
-
-
-                    const comments = document.querySelector('ytd-comment-thread-renderer').parentElement;
-
-                    //comment author pngs size
-                    comments.querySelectorAll('yt-img-shadow').forEach(query => {
-                        query.style.setProperty('width', ( ( 40 + difference ) + "px" ));
-                        query.style.setProperty('height', ( ( 40 + difference ) + "px" ));
-                    });
-
-                    //comment emoji size
-                    comments.querySelectorAll('#main img').forEach(query => {
-                        query.style.setProperty('width', ( ( 14 + difference ) + "px" ));
-                        query.style.setProperty('height', ( ( 14 + difference ) + "px" ));
-                    });
-
-
-                    document.querySelectorAll('yt-sub-thread').forEach(query => {
-                        query.childNodes[0].style.setProperty('width', ( ( 36 + difference + 2 ) + "px" ));
-                    })
-                }
-            } catch(e){}
-
+            BetterZoomWatchPageChanges();
         }
-        else {
-            try {
-                columns.style.setProperty('--ytd-watch-flexy-sidebar-width', '402px');
-            } catch(e){}
+        else { //zoom is not enabled
+            BetterZoomWatchPageReset();
         }
-
-
-
-     //   trd-watch-flexy.attribute(--ytd-watch-flexy-max-player-width-wide-screen = '100%');
-     //   const playerContainer = document.getElementById('movie_player');
-     //   playerContainer.style.
 
 
 
@@ -278,14 +697,6 @@ TODO:
             aiSummary.style.display = showAI ? '' : 'none';
         } catch(e) {}
 
-
-        //try {
-        //    let container = document.querySelector('#secondary #secondary-inner #related #items ytd-item-section-renderer #contents');
-        //
-        //    if (debugMode) {
-        //        console.log("container:", {container});
-        //    }
-        //}catch(e){}
         let container;
         try {
             container = (document.querySelector('yt-lockup-view-model').parentElement);
@@ -323,11 +734,23 @@ TODO:
 
 
                 //Check For Shelfs
-                container.querySelectorAll('ytd-reel-shelf-renderer').forEach(query => {
-                    const title = query.querySelector('#title')?.textContent.trim().toLowerCase();
-                    if (title === "shorts") {
-                        query.style.display = showShorts ? '' : 'none';
-                    } else { console.log(title); }
+                document.querySelectorAll('ytd-reel-shelf-renderer').forEach(query => {
+                    container = document.querySelector('ytd-reel-shelf-renderer').forEach(query => {
+                        let title = query.querySelector('#title')?.textContent.trim().toLowerCase();
+
+                        if (debugMode) {
+                            console.log("section: ",query);
+                        }
+
+                        if (title === "shorts") {
+                            query.style.display = showShorts ? '' : 'none';
+                        }
+                        else {
+                            if (debugMode) {
+                                console.log('title not used: ', title);
+                            }
+                        }
+                    })
                 });
 
                 //Badge Checks
@@ -362,6 +785,7 @@ TODO:
             }
         } catch(e) {}
     }
+
 
 
     function processVideos() {
@@ -405,8 +829,12 @@ TODO:
     }
 
 
+
     function startItemBadgeChecks() {
-        container = document.getElementById('contents');
+        //const container = document.getElementById('contents');
+        const container = getContents();//document.querySelector('ytd-rich-item-renderer').parentElement
+
+
             if (container) {
                 container.querySelectorAll('ytd-rich-item-renderer').forEach(query => {
                     const badgeTextAll  = query.querySelectorAll('.yt-badge-shape__text');
@@ -437,24 +865,29 @@ TODO:
                     switch (badgeTextAll[0]?.textContent.trim().toLowerCase()) {  //mix: M3 3.657v16.689a1 1 0 001.466.883L8 19.369V4.632l-3.534-1.86A1 1 0 003 3.657ZM14 7.79l-4-2.105v12.631l4-2.106V7.79ZM22 12l-6-3.157v6.315L22 12Z
                         case 'mix':
                             query.style.display = showMusic ? '' : 'none';
+                            break;
                     }
 
                     switch (badgeTextAll[2]?.textContent.trim().toLowerCase()) {
                         case 'members only':
                             query.style.display = showMemberOnly ? '' : 'none';
+                            break;
 
                         case 'free':
                             query.style.display = showFreeMovies ? '' : 'none';
+                            break;
                     }
 
                     switch (iconPathStart) { //note: M5.5 1.383V6.88a2.25 2.25 0 101 1.871V4.6l2.743 1.647a.5.5 0 00.757-.43V3.485a.5.5 0 00-.243-.429l-3.5-2.1a.5.5 0 00-.757.427Z
                         case ('M5'):
                             query.style.display = showMusic ? '' : 'none';
+                            break;
                     }
 
                     switch(badgeRenderer) {
                         case 'purchased':
                             query.style.display = showPurchased ? '' : 'none';
+                            break;
                     }
 
 
@@ -463,24 +896,30 @@ TODO:
     }
 
 
+
     function toggleBanner() {
         const banner = document.querySelector('ytd-statement-banner-renderer');
         if (banner) {
-            banner.style.display = showBanner ? '' : 'none';
+            banner.parentElement.style.display = showBanner ? '' : 'none'; //banner.parentElement.parentElement.style.display = showBanner ? '' : 'none';
         }
     }
 
 
+
     function toggleStreamerMode() {
         const enabled = enableStreamerMode ? 'none' : '';
+            try {
+                toggleQuerySelectorAll('ytd-merch-shelf-renderer', enabled);             //toggle Merch Under Videos
+                toggleQuerySelector('ytd-comment-simplebox-renderer', enabled);          //toggle Commenting Under Videos
+                toggleQuerySelector('ytd-topbar-menu-button-renderer', enabled);         //toggle top right profile picture
+                toggleQuerySelector('ytd-guide-section-renderer:nth-child(2)', enabled); //toggle subscriptions on the left side menu on the homepage
+                toggleGetElementById('country-code', enabled);                           //toggle users country on the top left logo
+                toggleQuerySelectorAll('#reply-button-end', enabled);                    //remove reply button in comments
 
-            toggleQuerySelector('ytd-merch-shelf-renderer', enabled);                //toggle Merch Under Videos
-            toggleQuerySelector('ytd-comment-simplebox-renderer', enabled);          //toggle Commenting Under Videos
-            toggleQuerySelector('ytd-topbar-menu-button-renderer', enabled);         //toggle top right profile picture
-            toggleQuerySelector('ytd-guide-section-renderer:nth-child(2)', enabled); //toggle subscriptions on the left side menu on the homepage
 
-            toggleGetElementById('country-code', enabled);                           //toggle users country on the top left logo
-
+            } catch (e) {
+                setTimeout("streamer mode failed...retrying",toggleStreamerMode, 50);
+            }
     }
 
 
@@ -496,6 +935,7 @@ TODO:
         });
     }
   */
+
 
 
     function checkItemsPerRow() {
@@ -519,6 +959,7 @@ TODO:
     }
 
 
+
     function debounce(func, delay) {
         let timeout;
         return function (...args) {
@@ -528,9 +969,10 @@ TODO:
             }, delay);
         };
     }
-    const dcheckItemsPerRow = debounce(checkItemsPerRow, 1000);
+        //const dcheckItemsPerRow = debounce(checkItemsPerRow, 1000);
 
     function startObservers() {
+        try {
         const observer = new MutationObserver(() => {
             let currentURL = document.URL;
             toggleStreamerMode();
@@ -538,8 +980,8 @@ TODO:
 
 
             if (currentURL === "https://www.youtube.com/") {
-                if (debugMode && (currentURL !== prevURL)) {
-                    console.log("On Home Page");
+                if (debugMode) {
+                    console.log("Current URL (homepage): ", currentURL);
                 }
                 toggleBanner();
                 checkItemsPerRow();//dcheckItemsPerRow();
@@ -550,8 +992,8 @@ TODO:
             }
 
             else if (currentURL.startsWith("https://www.youtube.com/watch?v=")) {
-                if (debugMode && (currentURL !== prevURL)) {
-                    console.log("On Watch Page");
+                if (debugMode) {
+                    console.log("Current URL (Watch Page): ", currentURL);
                 }
                 startVideoChecks();
             }
@@ -560,7 +1002,11 @@ TODO:
             prevURL = currentURL; //global
         });
         observer.observe(document.body, { childList: true, subtree: true });
-    }
+        } catch(e) {
+            console.log("observers failed: ", e, " retrying...");
+            startObservers();
+        } //restart observers
+        }
 
 
 
@@ -568,35 +1014,107 @@ TODO:
 
 
     function clicked(button, menu) {
-        console.log("boop: ", button);
+        //console.log("boop: ", button);
 
         //button.innerHTML = "changed"; this worked
 
         const rect = button.getBoundingClientRect();
+
+        //console.log ("Menu Button Rect: ", button.getBoundingClientRect());
+        //console.log ("Menu Container Rect: ", menu.getBoundingClientRect());
+
+
         menu.style.top = rect.bottom + 5 + 'px';
         menu.style.left = rect.left + 'px';
         menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
+        if (enableBetterZoom) {
+            let zoom = getZoomOut();
+            switch(zoom) {
+                case(1): //90
+                    setElementProperty(menu, 'transform', 'scale('+(1.1), ')');
+                    break;
+                case(2): //80
 
+                    setElementProperty(menu, 'transform', 'scale('+(1.1), ')');
+                    break;
+                case(3): //70
+
+                    setElementProperty(menu, 'transform', 'scale('+(1.1), ')');
+                    break;
+                case(4): //60
+
+                    setElementProperty(menu, 'transform', 'scale('+(1.1), ')');
+                    break;
+                case(5): //50
+
+                    setElementProperty(menu, 'transform', 'scale('+(1.1), ')');
+                    break;
+                case(6): //40
+
+                    setElementProperty(menu, 'transform', 'scale('+(1.1), ')');
+                    break;
+                case(7): //30
+
+                    setElementProperty(menu, 'transform', 'scale('+(1.1), ')');
+                    break;
+                default:
+                    setElementProperty(menu, 'transform', '', '');
+                break;
+            }
+            console.log ("Menu Button Rect (+): ", button.getBoundingClientRect());
+            console.log ("Menu Container Rect (+): ", menu.getBoundingClientRect());
+            menu.style.top = rect.bottom * 2 + 'px';
+            menu.style.left = rect.left + 'px';
+            console.log ("Menu Button Rect (++): ", button.getBoundingClientRect());
+            console.log ("Menu Container Rect (++): ", menu.getBoundingClientRect());
+
+            //menu.style.transform = 'scale(' + ( (getZoomOut() > 0 ? getZoomOut() : 1) ) + ')';
+        }
     }
 
 
     function createMenuButton() {
+      const voiceSearchButton = document.querySelector('#voice-search-button');
+
+/*
+      let el = document.createElement('this-is-a-test')
+      voiceSearchButton.parentElement.appendChild(el);
+
+      let button = document.createElement('yttbutton'), btnStyle = button.style;
+      button.className = "yt-spec-button-shape-next yt-spec-button-shape-next--tonal yt-spec-button-shape-next--overlay yt-spec-button-shape-next--size-m yt-spec-button-shape-next--icon-leading yt-spec-button-shape-next--enable-backdrop-filter-experiment"
+      button.style.flex = 'revert';
+      button.style.margin = '12px';
+      button.style.userSelect = 'none';
+      button.innerHTML = "YTT Menu";
+      let menu = createMenu();
+      button.onclick = function() {clicked(button, menu)};
+      voiceSearchButton.parentElement.appendChild(button);
+*/
+
+
+        try {
         const voiceSearchButton = document.querySelector('#voice-search-button');
 
         let button = document.createElement('yttbutton'), btnStyle = button.style;
         button.className = "yt-spec-button-shape-next yt-spec-button-shape-next--tonal yt-spec-button-shape-next--overlay yt-spec-button-shape-next--size-m yt-spec-button-shape-next--icon-leading yt-spec-button-shape-next--enable-backdrop-filter-experiment"
         button.style.flex = 'revert';
         button.style.margin = '12px';
-
+        button.style.userSelect = 'none';
 
         document.querySelector('#voice-search-button').appendChild(button);
-        button.innerHTML = "YTT Menu";
-
+        //button.innerHTML = "YTT Menu";
+        button.appendChild(document.createTextNode("YTT Menu"));
 
         let menu = createMenu();
         button.onclick = function() {clicked(button, menu)};
 
         voiceSearchButton.parentElement.appendChild(button);
+        } catch(e) {
+            console.log("Failed To Create Menu Button: ", " retrying...");
+            setTimeout(createMenuButton, 50);
+        } //keep trying until it is made
+
+
     }
 
 
@@ -604,17 +1122,18 @@ TODO:
         //font-size: 10px;font-family: Roboto, Arial, sans-serif;
         const menuContainer = document.createElement('div');
         menuContainer.style.position        = 'fixed';
-        menuContainer.style.backgroundColor = '#222';
-        menuContainer.style.color           = '#fff';
+        menuContainer.style.backgroundColor = '#282828';
+        menuContainer.style.color           = '#f1f1f1';
         menuContainer.style.padding         = '10px';
         menuContainer.style.display         = 'none';
         menuContainer.style.zIndex          = '9999';
-        menuContainer.style.border          = '1px solid #555';
-        menuContainer.style.boxShadow       = '0 2px 10px rgba(0,0,0,0.5)';
+        //menuContainer.style.border          = '1px solid #555';
+        //menuContainer.style.boxShadow       = '0 2px 10px rgba(0,0,0,0.5)';
         menuContainer.style.whiteSpace      = 'nowrap';
         menuContainer.style.flexDirection   = 'column';
         menuContainer.style.gap             = '5px';
         menuContainer.style.borderRadius    = '4px';
+        menuContainer.style.userSelect      = 'none';
 
 
         const createCheckbox = (labelText, settingKey, onChange) => {
@@ -632,41 +1151,33 @@ TODO:
             });
             checkbox.style.cursor = 'pointer';
 
-
             const label = document.createElement('label');
             label.textContent = labelText;
             label.style.marginLeft = '6px';
 
-
             wrapper.appendChild(checkbox);
             wrapper.appendChild(label);
+
             return wrapper;
         };
 
         //Toggle Menu Options
-        menuContainer.appendChild(createCheckbox('Debug Mode',                              'enhancer-debug-mode',                      () => { debugMode               = !debugMode;                                                           }));
-
-        menuContainer.appendChild(createCheckbox('Log Metadata',                            'enhancer-logging',                         () => { enableLogging           = !enableLogging;           processVideos();                            }));
-        menuContainer.appendChild(createCheckbox('Enable Streamer Mode',                    'enhancer-enable-streamer-mode',            () => { enableStreamerMode      = !enableStreamerMode;      toggleStreamerMode();                       }));
-        menuContainer.appendChild(createCheckbox('Enable Better Zoom',                      'enhancer-enable-better-zoom',              () => { enableBetterZoom        = !enableBetterZoom;        checkItemsPerRow();startVideoChecks();      }));
-
-
-        menuContainer.appendChild(createCheckbox('Show Watched Videos',                     'enhancer-show-watched',                    () => { showWatched             = !showWatched;             processVideos();startVideoChecks();         }));
-
-
-        menuContainer.appendChild(createCheckbox('Show Breaking News',                      'enhancer-breaking-news',                   () => { showBreakingNews        = !showBreakingNews;        startShelfChecks();                         }));
-        menuContainer.appendChild(createCheckbox('Show Shorts',                             'enhancer-show-shorts',                     () => { showShorts              = !showShorts;              startShelfChecks();                         }));
-        menuContainer.appendChild(createCheckbox('Show Games',                              'enhancer-show-games',                      () => { showGames               = !showGames;               startShelfChecks();                         }));
-        menuContainer.appendChild(createCheckbox('Show Posts',                              'enhancer-show-posts',                      () => { showPosts               = !showPosts;               startShelfChecks();                         }));
-        /*untested*/menuContainer.appendChild(createCheckbox('Show Explore More Topics',    'enhancer-show-explore-more-topics',        () => { showExploreMoreTopics   = !showExploreMoreTopics;   startShelfChecks();                         }));
-
-
-        menuContainer.appendChild(createCheckbox('Show AI',                                 'enhancer-show-ai',                         () => { showAI                  = !showAI;                  startItemChecks();startVideoChecks();       }));
-        menuContainer.appendChild(createCheckbox('Show Playlists and Podcasts',             'enhancer-show-playlists',                  () => { showPlaylists           = !showPlaylists;           startItemChecks();                          }));
-        menuContainer.appendChild(createCheckbox('Show Purchased Videos',                   'enhancer-show-purchased',                  () => { showPurchased           = !showPurchased;           startItemBadgeChecks();                     }));
-        menuContainer.appendChild(createCheckbox('Show Music',                              'enhancer-show-music',                      () => { showMusic               = !showMusic;               startItemBadgeChecks();                     }));
-        menuContainer.appendChild(createCheckbox('Show Free Movies',                        'enhancer-show-free-movies',                () => { showFreeMovies          = !showFreeMovies;          startItemBadgeChecks();startVideoChecks();  }));
-        menuContainer.appendChild(createCheckbox('Show Banner',                             'enhancer-show-banner',                     () => { showBanner              = !showBanner;              toggleBanner();                             }));
+        menuContainer.appendChild(createCheckbox('Debug Mode',                      'enhancer-debug-mode',                  () => { debugMode               = !debugMode;                                                                            }));
+        menuContainer.appendChild(createCheckbox('Log Metadata',                    'enhancer-logging',                     () => { enableLogging           = !enableLogging;           processVideos();                                             }));
+        menuContainer.appendChild(createCheckbox('Enable Streamer Mode',            'enhancer-enable-streamer-mode',        () => { enableStreamerMode      = !enableStreamerMode;      toggleStreamerMode();                                        }));
+        menuContainer.appendChild(createCheckbox('Enable Better Zoom',              'enhancer-enable-better-zoom',          () => { enableBetterZoom        = !enableBetterZoom;        isHomepage() ? checkItemsPerRow(): startVideoChecks()        }));
+        menuContainer.appendChild(createCheckbox('Show Watched Videos',             'enhancer-show-watched',                () => { showWatched             = !showWatched;             isHomepage() ? processVideos() : startVideoChecks()          }));
+        menuContainer.appendChild(createCheckbox('Show Breaking News',              'enhancer-breaking-news',               () => { showBreakingNews        = !showBreakingNews;        startShelfChecks();                                          }));
+        menuContainer.appendChild(createCheckbox('Show Shorts',                     'enhancer-show-shorts',                 () => { showShorts              = !showShorts;              startShelfChecks();                                          }));
+        menuContainer.appendChild(createCheckbox('Show Games',                      'enhancer-show-games',                  () => { showGames               = !showGames;               startShelfChecks();                                          }));
+        menuContainer.appendChild(createCheckbox('Show Posts',                      'enhancer-show-posts',                  () => { showPosts               = !showPosts;               startShelfChecks();                                          }));
+        menuContainer.appendChild(createCheckbox('Show Explore More Topics',        'enhancer-show-explore-more-topics',    () => { showExploreMoreTopics   = !showExploreMoreTopics;   startShelfChecks();                                          }));
+        menuContainer.appendChild(createCheckbox('Show AI',                         'enhancer-show-ai',                     () => { showAI                  = !showAI;                  isHomepage() ? startItemChecks() : startVideoChecks()        }));
+        menuContainer.appendChild(createCheckbox('Show Playlists and Podcasts',     'enhancer-show-playlists',              () => { showPlaylists           = !showPlaylists;           startItemChecks();                                           }));
+        menuContainer.appendChild(createCheckbox('Show Purchased Videos',           'enhancer-show-purchased',              () => { showPurchased           = !showPurchased;           startItemBadgeChecks();                                      }));
+        menuContainer.appendChild(createCheckbox('Show Music',                      'enhancer-show-music',                  () => { showMusic               = !showMusic;               startItemBadgeChecks();                                      }));
+        menuContainer.appendChild(createCheckbox('Show Free Movies',                'enhancer-show-free-movies',            () => { showFreeMovies          = !showFreeMovies;          isHomepage() ? startItemBadgeChecks() : startVideoChecks();  }));
+        menuContainer.appendChild(createCheckbox('Show Banner',                     'enhancer-show-banner',                 () => { showBanner              = !showBanner;              toggleBanner();                                              }));
 
 
         //Still Field Testing
@@ -676,11 +1187,15 @@ TODO:
 
 
       //menuContainer.appendChild(createCheckbox('Show New',                    'enhancer-show-new',         () => { showNew          = !showNew;          toggleNew();               }));
-
+        //isHomepage() = true ? fun1() : fun2();
 
         document.body.appendChild(menuContainer);
         return menuContainer;
     }
+
+
+
+
 
     function waitForBody() {
         if (document.body) {
