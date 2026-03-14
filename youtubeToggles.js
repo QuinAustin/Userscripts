@@ -1,7 +1,7 @@
-// ==UserScript==
+ // ==UserScript==
 // @name         YouTube Toggles
 // @namespace    Violentmonkey Scripts
-// @version      1.0.7
+// @version      1.0.71
 // @description  Allows disabling a variety of YouTube features
 // @author       -
 // @match        https://www.youtube.com/*
@@ -17,7 +17,7 @@
 
 
 /*
-Changelog 1.0.7 
+Changelog 1.0.7
     -toggles that call two functions (one for homepage, one for watchpage), now only call one based on the current document.url returned
 
     -functions now check a getContents() function to get the correct 'contents' element.
@@ -1178,11 +1178,10 @@ Changelog 1.0.7
         menuContainer.appendChild(createCheckbox('Show Music',                      'enhancer-show-music',                  () => { showMusic               = !showMusic;               startItemBadgeChecks();                                      }));
         menuContainer.appendChild(createCheckbox('Show Free Movies',                'enhancer-show-free-movies',            () => { showFreeMovies          = !showFreeMovies;          isHomepage() ? startItemBadgeChecks() : startVideoChecks();  }));
         menuContainer.appendChild(createCheckbox('Show Banner',                     'enhancer-show-banner',                 () => { showBanner              = !showBanner;              toggleBanner();                                              }));
-
+        menuContainer.appendChild(createCheckbox('Show New To You Message',         'enhancer-show-new-to-you',             () => { showNewToYou            = !showNewToYou;            startItemChecks();                                           }));
 
         //Still Field Testing
         /*badgeTextAll[1? and 2?]*/menuContainer.appendChild(createCheckbox('Show Member Only (alpha)',             'enhancer-show-member-only',      () => { showMemberOnly     = !showMemberOnly;     startItemBadgeChecks();  }));
-        /*untested*/menuContainer.appendChild(createCheckbox('Show New To You Message (alpha)',      'enhancer-show-new-to-you',       () => { showNewToYou       = !showNewToYou;       startItemChecks();      }));
 
 
 
