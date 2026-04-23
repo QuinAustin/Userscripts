@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Toggles
 // @namespace    Violentmonkey Scripts
-// @version      1.1.0
+// @version      1.1.01
 // @description  Allows disabling a variety of YouTube features
 // @author       -
 // @match        https://www.youtube.com/*
@@ -22,22 +22,23 @@ Changelog 1.1.0
       YouTube Changed Class Names:
         .yt-badge-shape__text     ->    .ytBadgeShapeText
         .yt-badge-shape__icon     ->    .ytBadgeShapeIcon
-      
-    - Variables for Keys boolean are simplified a little better 
+
+    - Variables for Keys boolean are simplified a little better
     - The first time the program is used, or when localStorage does not contain keys, will now correctly set certain keys to being false by default instead of true.
     - Used minified js in some locations to simplify some logic.
-    - The better zoom function is now able to keep the menu tracked to the button using an observer 
-    - The wait for document.body is simplified, and when completed it will call main() to start the observer for calling different functions 
-    - The menu is more in line with what YouTube looks like, and is also resizeable 
+    - The better zoom function is now able to keep the menu tracked to the button using an observer
+    - The wait for document.body is simplified, and when completed it will call main() to start the observer for calling different functions
+    - The menu is more in line with what YouTube looks like, and is also resizeable
     - The logic for watched videos is now able to be set to a different value
     - Menu creation has less nesting, but still longer than it probably needs to be.
     - Console messages are now separated into different categories like, log, debug, warn, and error
-    - Before the menu is created, an observer is now checking to make sure the dynamic changes to voice-search-button are completed, before calling the function.  
-    
+    - Before the menu is created, an observer is now checking to make sure the dynamic changes to voice-search-button are completed, before calling the function.
+
 */
-
-
-
+/*
+HOTFIX 1.1.01
+  - backgroundColor updated from 'var(--yt-spec-additive-background)' -> 'var(--yt-sys-color-baseline--additive-background)'
+*/
 
 
 (function() {
@@ -1219,7 +1220,7 @@ Changelog 1.1.0
         replicatedButton.querySelector('path').setAttribute('d', 'M21 5H3a1 1 0 000 2h18a1 1 0 100-2Zm-3 6H6a1 1 0 000 2h12a1 1 0 000-2Zm-3 6H9a1 1 0 000 2h6a1 1 0 000-2Z')
         replicatedButton.style.borderRadius = '100px';
         replicatedButton.style.marginLeft = '12px';
-        replicatedButton.style.backgroundColor = 'var(--yt-spec-additive-background)';
+        replicatedButton.style.backgroundColor = 'var(--yt-sys-color-baseline--additive-background)';//'var(--yt-spec-additive-background)';
 
         const menu = createMenu();
         populateMenuContainer(menu);
@@ -1500,7 +1501,7 @@ function checkPerformance(o){const n=performance.now();o();const e=performance.n
       }
 
 
-     
+
 
 
       function homepageCalls() {
