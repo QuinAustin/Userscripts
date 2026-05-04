@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Toggles
 // @namespace    Violentmonkey Scripts
-// @version      1.1.01
+// @version      1.1.1
 // @description  Allows disabling a variety of YouTube features
 // @author       -
 // @match        https://www.youtube.com/*
@@ -17,64 +17,44 @@
 
 
 /*
-Changelog 1.1.0
+Changelog 1.1.1
 
-      YouTube Changed Class Names:
-        .yt-badge-shape__text     ->    .ytBadgeShapeText
-        .yt-badge-shape__icon     ->    .ytBadgeShapeIcon
+Added Search Page to the URL's being modified
+Added toggles for Current YouTube Labs Features (currently some weird ai chat for searching videos)
+  This should hopefully help with being able to remove this feature in the future (if it ever does get added as a non-experimental feature)
 
-    - Variables for Keys boolean are simplified a little better
-    - The first time the program is used, or when localStorage does not contain keys, will now correctly set certain keys to being false by default instead of true.
-    - Used minified js in some locations to simplify some logic.
-    - The better zoom function is now able to keep the menu tracked to the button using an observer
-    - The wait for document.body is simplified, and when completed it will call main() to start the observer for calling different functions
-    - The menu is more in line with what YouTube looks like, and is also resizeable
-    - The logic for watched videos is now able to be set to a different value
-    - Menu creation has less nesting, but still longer than it probably needs to be.
-    - Console messages are now separated into different categories like, log, debug, warn, and error
-    - Before the menu is created, an observer is now checking to make sure the dynamic changes to voice-search-button are completed, before calling the function.
+Added a lambda function for checking badges attached to videos
+
+New Badges being checked
+    'Sponsored'
+    'Free with ads'
+    'Members First'
+    'live'
+
+
+New Shelf Checks
+  'free primetime movies'
 
 */
+
+
+
+
+
 /*
-HOTFIX 1.1.01
-  - backgroundColor updated from 'var(--yt-spec-additive-background)' -> 'var(--yt-sys-color-baseline--additive-background)'
+KNOWN BUGS:
+
+-When Guide is turned off, if the first video in a row is under the location where the Guide WOULD be, the video will not autoplay.
+  *Temporary Solution: Turning the Guide back on, OR zoom out so the video is no longer under where the Guide's area would be.
+
 */
+
+
+
 
 
 (function() {
     'use strict';
-    let clonePossible = false;
-
-
-    let prevURL = document.URL
-
-    //########################
-    //  Descriptions
-    //########################
-    /*
-    enableLogging    | console logs metadata from every video that shows up in the DOM
-    showBreakingNews | a "scrollable" shelf (row) of videos, usually multiple news channels covering important (local, national, international)  news and events
-    showShorts       | as name implies
-    showGames        | as name implies
-    showWatched      | videos that show the red line on the timeline as being 100% full
-    showPurchased    | videos (movies/shows/events) that show the "purchased" badge
-    showAI           | the "AI" prompt that tells you to type what kind of videos to show you
-    showMusic        | anything that shows "mix" or has the music note next to the duration
-    showPlaylists    | playlists and podcasts that show on the homepage (sometimes called lessons when it comes from an educational channel)
-    showBanner       | big banner at the top of the homepage, usually some YouTube Ad/Event
-    */
-
-
-
-
-
-//    let showChannelStore    = localStorage.getItem('ytt-show-channel-store') !== "false";
-//    let showMemberJoin      = localStorage.getItem('ytt-show-member-join') !== "false";
-//    let showThanksDonation  = localStorage.getItem('ytt-show-thanks-donation') !== "false";
-
-
-
-
   //This is for example purposes
     let showToggle            = localStorage.getItem('ytt-show-toggle')          !== "false";
 
@@ -103,6 +83,9 @@ HOTFIX 1.1.01
 
     let showFreeMovies          = localStorage.getItem('ytt-show-free-movies') !== "false";
     let showMemberOnly          = localStorage.getItem('ytt-show-member-only') !== "false";
+    let showSponsored           = localStorage.getItem('ytt-show-sponsored')   !== "false";
+    let showLivestreams         = localStorage.getItem('ytt-show-livestreams') !== "false";
+
 
   /*======================================================
    *        WATCH PAGE TOGGLES
@@ -125,8 +108,13 @@ HOTFIX 1.1.01
     let enableBetterZoom      = localStorage.getItem('ytt-enable-better-zoom')   !== "false";
     let enableStreamerMode    = localStorage.getItem('ytt-enable-streamer-mode') !== "false";
 
+
+    let showLabsFeature       = localStorage.getItem('ytt-show-labs-feature') !== "false";
+
+
     let debugMode               = localStorage.getItem('ytt-debug-mode')       !== "false";
     let enableLogging           = localStorage.getItem('ytt-logging')          !== "false";
+
 
 
 
@@ -206,6 +194,34 @@ HOTFIX 1.1.01
 
 
 
+  function toggleLabsFeature() {
+
+      //looking for a button with an aria-label "Search using AI Mode"
+      const center = document.querySelector("#center");
+      const AISearchButton =  center.querySelector('[aria-label="Search using AI Mode"]');
+      const AISearchbox = center.querySelector("#i0");
+      const AISearchboxComponents = document.querySelector('.ytSearchboxComponentActions');
+
+      const AISearchText = document.querySelector('[placeholder="Search or ask a question"]');
+      const scrollContainer = document.querySelector('#scroll-container');
+
+      AISearchButton&&(AISearchButton.style.display=showLabsFeature?"":"none");
+      AISearchbox&&(AISearchbox.style.display=showLabsFeature?"":"none");
+      AISearchboxComponents&&(AISearchboxComponents.style.display=showLabsFeature?"":"none");
+
+
+      AISearchText&&(AISearchText.placeholder=showLabsFeature?"Search or ask a question":"Search");
+
+      if(scrollContainer) {
+          const AIChip = scrollContainer.querySelector('[chip-style="STYLE_AI_MODE_CHIP"]')
+          if (AIChip) {
+              AIChip.style.display = showLabsFeature ? "" : "none";
+          }
+      }
+  }
+
+
+
 
 
 
@@ -262,10 +278,10 @@ HOTFIX 1.1.01
     function toggleAI() {
 
         const buttons = document.querySelectorAll('#flexible-item-buttons .ytSpecButtonShapeNextHost'); //Next to Save button
-
+        const enabled = enableStreamerMode ? 'none' : '';
         buttons.forEach(query => {
             if (query.textContent === "Ask") {
-                toggleQuerySelector(query, showAI);
+                query.style.display = enabled;
             }
         })
 
@@ -275,9 +291,9 @@ HOTFIX 1.1.01
 
 
 
-        toggleQuerySelector("#video-summary",showAI) //AI summary in video descriptions
-        toggleQuerySelector("yt-video-description-youchat-section-view-model",showAI) //gemini button in video description (pulls up a chat window)
-        toggleQuerySelector(".you-chat-entrypoint-button",showAI)                     //gemini button in the video player (pulls up a chat window)
+        toggleQuerySelector("#video-summary",enabled) //AI summary in video descriptions
+        toggleQuerySelector("yt-video-description-youchat-section-view-model",enabled) //gemini button in video description (pulls up a chat window)
+        toggleQuerySelector(".you-chat-entrypoint-button",enabled)                     //gemini button in the video player (pulls up a chat window)
 
 
     }
@@ -299,13 +315,6 @@ HOTFIX 1.1.01
             toggleAI();
         }
     }
-
-
-
-
-
-
-
 
 
 
@@ -360,6 +369,9 @@ HOTFIX 1.1.01
                         break;
                         case 'what did you think of this video?':
                             query.style.display = showWhatDidYouThink ? '' : 'none';
+                        break;
+                        case 'free primetime movies':
+                            query.style.display = showFreeMovies ? '' : 'none';
                         break;
                         default:
                             console.info(
@@ -849,7 +861,7 @@ HOTFIX 1.1.01
                     if (badgeTextAll[1]) {
                         console.info("badgeTextAll[1] found");
                         //showFreeMovies
-                        if (badgeTextAll[1]?.textContent.trim().toLowerCase() === 'free') {
+                        if (badgeTextAll[1]?.textContent.trim().toLowerCase().startsWith('free')) {
                             query.style.display = showFreeMovies ? '' : 'none';
                         }
                     }
@@ -948,31 +960,91 @@ HOTFIX 1.1.01
                 }
 
 
-
-
-                switch (badgeTextAll[0]?.textContent.trim().toLowerCase()) {  //mix: M3 3.657v16.689a1 1 0 001.466.883L8 19.369V4.632l-3.534-1.86A1 1 0 003 3.657ZM14 7.79l-4-2.105v12.631l4-2.106V7.79ZM22 12l-6-3.157v6.315L22 12Z
-                    case 'mix':
+                const checkBadge = (text) => {
+                  text = text?.textContent.trim().toLowerCase()
+                  switch(text) {
+                    case 'mix': //mix: M3 3.657v16.689a1 1 0 001.466.883L8 19.369V4.632l-3.534-1.86A1 1 0 003 3.657ZM14 7.79l-4-2.105v12.631l4-2.106V7.79ZM22 12l-6-3.157v6.315L22 12Z
                         query.style.display = showMusic ? '' : 'none';
                         break;
-                }
-                switch (badgeTextAll[2]?.textContent.trim().toLowerCase()) {
-                    case 'members only':
+                    case 'sponsored':
+                        query.style.display = showSponsored ? '' : 'none';
+                        break;
+                    case 'members only':  //youtube featured badge can take place of members only apparently?
                         query.style.display = showMemberOnly ? '' : 'none';
                         break;
-
+                    case 'members first':
+                        query.style.display = showMemberOnly ? '' : 'none';
+                        break;
                     case 'free':
                         query.style.display = showFreeMovies ? '' : 'none';
                         break;
+                    case "free with ads":
+                        query.style.display = showFreeMovies ? '' : 'none';
+                        break;
+                    case "live":
+                        query.style.display = showLivestreams ? '' : 'none';
+                    case undefined:
+                        break;
+                    case "": //<empty string>
+                        break;
+                    default:
+                        if (text.includes(":") === false) { //timestamp
+                          //if (text.includes("tv-14", "tv-pg", "tv-g", "tv-ma", "g", "pg", "r", "unrated") === false) { //still a movie/show
+                              //console.log("new badge not accounted for: ", text);
+                          //}
+                        }
+                  }
                 }
-                switch (badgeTextAll[3]?.textContent.trim().toLowerCase()) {    //youtube featured badge can take place of members only apparently?
-                    case 'members only':
+                //badgeTextAll.forEach(badge => {
+                for (const badge of badgeTextAll) {
+                  if (checkBadge(badge) === true) {
+                    break;
+                  }
+                }
+
+
+
+
+                //checkBadge(badgeTextAll[0]);
+                //checkBadge(badgeTextAll[1]);
+                //checkBadge(badgeTextAll[2]);
+                //checkBadge(badgeTextAll[3]);
+
+
+
+                //checkBadge(badgeTextAll[4]);
+                //checkBadge(badgeTextAll[5]);
+
+                /*
+                switch (badgeTextAll[0]?.textContent.trim().toLowerCase(), badgeTextAll[1]?.textContent.trim().toLowerCase(), badgeTextAll[2]?.textContent.trim().toLowerCase(), badgeTextAll [3]?.textContent.trim().toLowerCase()) {
+                    case 'mix': //mix: M3 3.657v16.689a1 1 0 001.466.883L8 19.369V4.632l-3.534-1.86A1 1 0 003 3.657ZM14 7.79l-4-2.105v12.631l4-2.106V7.79ZM22 12l-6-3.157v6.315L22 12Z
+                        query.style.display = showMusic ? '' : 'none';
+                        break;
+                    case 'sponsored':
+                        query.style.display = showSponsored ? '' : 'none';
+                        break;
+                    case 'members only':  //youtube featured badge can take place of members only apparently?
                         query.style.display = showMemberOnly ? '' : 'none';
                         break;
-
                     case 'free':
                         query.style.display = showFreeMovies ? '' : 'none';
                         break;
+                    case "free with ads":
+                        console.log("Free With Ads Badge Found", query);
+                        query.style.display = showFreeMovies ? '' : 'none';
+                        break;
                 }
+
+
+
+
+*/
+
+
+
+
+
+
                 switch (iconPathStart) { //note: M5.5 1.383V6.88a2.25 2.25 0 101 1.871V4.6l2.743 1.647a.5.5 0 00.757-.43V3.485a.5.5 0 00-.243-.429l-3.5-2.1a.5.5 0 00-.757.427Z
                     case ('M5'):
                         query.style.display = showMusic ? '' : 'none';
@@ -996,11 +1068,6 @@ HOTFIX 1.1.01
         const enabled = enableStreamerMode ? 'none' : '';
             try {
 
-
-
-
-
-
                 //Top Priority | The page loading is enough to see it
                 toggleGetElementById('country-code', enabled);                           //toggle users country abbreviation on the top left YouTube logo | reveals location of user
                 toggleQuerySelector('#end #buttons', enabled)                            //toggle user profile picture (as well as create button and notifications) | profile picture is the only reason for such a high priority
@@ -1020,7 +1087,6 @@ HOTFIX 1.1.01
                 //remove items from the left side bar
                 document.querySelectorAll('ytd-mini-guide-entry-renderer.style-scope .yt-simple-endpoint').forEach(query => {
                     const title = query.title;
-
                     switch (title) {
                         case 'Home':
                             //do nothing for now
@@ -1036,32 +1102,7 @@ HOTFIX 1.1.01
                         break;
                     }
                 });
-
-
-                const container = getContents()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+              const container = getContents()
             } catch (e) {
                 setTimeout("streamer mode failed...retrying",toggleStreamerMode, 50);
             }
@@ -1328,6 +1369,8 @@ HOTFIX 1.1.01
               menuContainer.appendChild(createToggle('ShowPurchasedVideos'));
               menuContainer.appendChild(createToggle('ShowFreeMovies'));
               menuContainer.appendChild(createToggle('ShowMemberOnly'));
+              menuContainer.appendChild(createToggle('ShowSponsored'));
+              menuContainer.appendChild(createToggle('showLivestreams'));
 
       /*======================================================
        *        WATCH PAGE TOGGLES
@@ -1348,6 +1391,12 @@ HOTFIX 1.1.01
           menuContainer.appendChild(createLabel("Experimental Toggles", '10px'));
               menuContainer.appendChild(createToggle('EnableBetterZoom'));
               menuContainer.appendChild(createToggle('EnableStreamerMode'));
+
+
+
+              menuContainer.appendChild(createToggle('ShowLabsFeature'));
+
+
 
           menuContainer.appendChild(createLabel("Console Logs", '10px'));
               menuContainer.appendChild(createToggle('DebugMode'));
@@ -1420,44 +1469,49 @@ HOTFIX 1.1.01
           //inputField('ShowToggle', 'ytt-show-toggle-field-variable');
         }
 
-        initToggle('ShowPrimaryHeader',         'ytt-show-primary-header',        () => { showPrimaryHeader     = !showPrimaryHeader;       togglePrimaryHeader();                                            }, "Primary Header",   "Tag header above homepage recommendations"                   );
-        initToggle('ShowGuide',                 'ytt-show-guide',                 () => { showGuide             = !showGuide;               toggleGuide();                                                    }, "Guide",            "The left side (Subscriptions, You, Explore, etc.)"          );
-        initToggle('ShowBanner',                'ytt-show-banner',                () => { showBanner            = !showBanner;              toggleBanner();                                                   }, "Banners",          "Turns on Banner"                                             );
+        initToggle('ShowPrimaryHeader',         'ytt-show-primary-header',        () => { showPrimaryHeader     = !showPrimaryHeader;       togglePrimaryHeader();                                            }, "Primary Header",   "Tag header above homepage recommendations"                );
+        initToggle('ShowGuide',                 'ytt-show-guide',                 () => { showGuide             = !showGuide;               toggleGuide();                                                    }, "Guide",            "The left side (Subscriptions, You, Explore, etc.)"        );
+        initToggle('ShowBanner',                'ytt-show-banner',                () => { showBanner            = !showBanner;              toggleBanner();                                                   }, "Banners",          "Turns on Banner"                                          );
 
 
-        initToggle('ShowRecommendations',       'ytt-show-recommendations',       () => { showRecommedations    = !showRecommedations;      toggleRecommendations();                                          }, "Recommendations",       "Turns on recommendations on videos watch pages"              );
-        initToggle('ShowBelow',                 'ytt-show-below',                 () => { showBelow             = !showBelow;               toggleBelow();                                                    }, "Below Player",          "Turns on information below watch page player"                );
-        initToggle('ShowComments',              'ytt-show-comments',              () => { showComments          = !showComments;            toggleComments();                                                 }, "Comments",              "Turns on comment section"                                    );
-        initToggle('ShowAI',                    'ytt-show-ai',                    () => { showAI                = !showAI;                  getURL_id() === 0 ? startItemChecks() : toggleAI();               }, "AI Summmary",           "Turns on YouTube's 'AI' features (including buttons)"                                                 );
+        initToggle('ShowRecommendations',       'ytt-show-recommendations',       () => { showRecommedations    = !showRecommedations;      toggleRecommendations();                                          }, "Recommendations",       "Recommendation section on video watchpages"          );
+        initToggle('ShowBelow',                 'ytt-show-below',                 () => { showBelow             = !showBelow;               toggleBelow();                                                    }, "Below Player",          "Everything below the video's player"                 );
+        initToggle('ShowComments',              'ytt-show-comments',              () => { showComments          = !showComments;            toggleComments();                                                 }, "Comments",              "The entire comment section"                          );
+        initToggle('ShowAI',                    'ytt-show-ai',                    () => { showAI                = !showAI;                  getURL_id() === 0 ? startItemChecks() : toggleAI();               }, "AI Features",           "YouTube's 'AI' features (summaries & buttons)"       );
 
 
 
-        initToggle('ShowShorts',                'ytt-show-shorts',                () => { showShorts             = !showShorts;              startShelfChecks();                                               }, "Shorts",                "Homepage Shorts"                                             );
-        initToggle('ShowGames',                 'ytt-show-games',                 () => { showGames              = !showGames;               startShelfChecks();                                               }, "Playables",             "Homepage Games"                                              );
+        initToggle('ShowShorts',                'ytt-show-shorts',                () => { showShorts             = !showShorts;              startShelfChecks();                                               }, "Shorts",                "Homepage Shorts"                                       );
+        initToggle('ShowGames',                 'ytt-show-games',                 () => { showGames              = !showGames;               startShelfChecks();                                               }, "Playables",             "Homepage Games"                                        );
         initToggle('ShowBreakingNews',          'ytt-breaking-news',              () => { showBreakingNews       = !showBreakingNews;        startShelfChecks();                                               }, "Breaking News",         "Breaking News On"                                      );
         initToggle('ShowPosts',                 'ytt-show-posts',                 () => { showPosts              = !showPosts;               startShelfChecks();                                               }, "Creator Posts",         "Creator Posts On"                                      );
         initToggle('ShowExploreMoreTopics',     'ytt-show-explore-more-topics',   () => { showExploreMoreTopics  = !showExploreMoreTopics;   startShelfChecks();                                               }, "Explore More Topics",   "Explore Topics On"                                     );
-        initToggle('ShowWhatDidYouThink',       'ytt-what-did-you-think',         () => { showWhatDidYouThink    = !showWhatDidYouThink;     startShelfChecks();                                               }, "Rating Videos",         "The 'What did you think of this video?' messages")
+        initToggle('ShowWhatDidYouThink',       'ytt-what-did-you-think',         () => { showWhatDidYouThink    = !showWhatDidYouThink;     startShelfChecks();                                               }, "Rating Videos",         "The 'What did you think of this video?' messages"      );
 
 
 
         initToggle('ShowMusic',                 'ytt-show-music',                 () => { showMusic             = !showMusic;               startItemBadgeChecks();                                           }, "Music",                 "Music in video format"                                       );
         initToggle('ShowPlaylistsandPodcasts',  'ytt-show-playlists',             () => { showPlaylists         = !showPlaylists;           startItemChecks();                                                }, "Playlists & Podcasts",  "Turns on Playlists & Podcasts"                               );
         initToggle('ShowNewToYouMessage',       'ytt-show-new-to-you',            () => { showNewToYou          = !showNewToYou;            startItemChecks();                                                }, "New To You Message",    "Turns on New To You Message"                                 );
-        initToggle('ShowWatchedVideos',         'ytt-show-watched',               () => { showWatched           = !showWatched;             getURL_id() === 0 ? processVideos() : startVideoChecks();         }, "Watched Videos",        "(When off) Videos Above This Watch Percentage Are Hidden: "                                     );
+        initToggle('ShowWatchedVideos',         'ytt-show-watched',               () => { showWatched           = !showWatched;             getURL_id() === 0 ? processVideos() : startVideoChecks();         }, "Watched Videos",        "(When off) Videos Above This Watch Percentage Are Hidden: "  );
             inputField('ShowWatchedVideos',         'ytt-max-watch-percent');
 
         initToggle('ShowPurchasedVideos',       'ytt-show-purchased',             () => { showPurchased         = !showPurchased;           startItemBadgeChecks();                                           }, "Purchased Videos",      "Turns on Purchased Videos"                                   );
-        initToggle('ShowFreeMovies',            'ytt-show-free-movies',           () => { showFreeMovies        = !showFreeMovies;          getURL_id() === 0 ? startItemBadgeChecks() : startVideoChecks();  }, "Free Movies",           "Turns on Free Movies"                                        );
+        initToggle('ShowFreeMovies',            'ytt-show-free-movies',           () => { showFreeMovies        = !showFreeMovies;          getURL_id() === 0 ? startItemBadgeChecks() : startVideoChecks();  }, "Free Movies",           "Turns on Free & Primetime Movies"                            );
         initToggle('ShowMemberOnly',            'ytt-show-member-only',           () => { showMemberOnly        = !showMemberOnly;          startItemBadgeChecks();                                           }, "Member Only",           "Turns on Members Only Videos"                                );
+        initToggle('ShowSponsored',             'ytt-show-sponsored',             () => { showSponsored         = !showSponsored;           startItemBadgeChecks();                                           }, "Sponsored",             "Turns on Sponsored Video Ads"                                );
+        initToggle('showLivestreams',           'ytt-show-livestreams',           () => { showLivestreams       = !showLivestreams;         startItemBadgeChecks();                                           }, "Livestreams",           "Turns on Livestreams"                                        );
 
-        initToggle('EnableBetterZoom',          'ytt-enable-better-zoom',         () => { enableBetterZoom      = !enableBetterZoom;        getURL_id()===0&&enableBetterZoom?homepageZoomOn():homepageZoomOff();       }, "Better Zoon",           "Allows content to fill the screen better when zooming out"   );
-                                                                                                                                            /*if (getURL_id() === 0 && enableBetterZoom) {homepageZoomOn();} else{homepageZoomOff();}*/
-        initToggle('EnableStreamerMode',        'ytt-enable-streamer-mode',       () => { enableStreamerMode    = !enableStreamerMode;      toggleStreamerMode();                                             }, "Streamer Mode",         "Tries Removing Identifying Information (*not perfect*)");
+
+        initToggle('EnableBetterZoom',          'ytt-enable-better-zoom',         () => { enableBetterZoom      = !enableBetterZoom;        getURL_id()===0&&enableBetterZoom?homepageZoomOn():homepageZoomOff();       }, "Better Zoon",           "Allows content to fill the screen better when zooming out"   );                                                                                                                               /*if (getURL_id() === 0 && enableBetterZoom) {homepageZoomOn();} else{homepageZoomOff();}*/
+        initToggle('EnableStreamerMode',        'ytt-enable-streamer-mode',       () => { enableStreamerMode    = !enableStreamerMode;      toggleStreamerMode();                                             }, "Streamer Mode",         "Tries Removing Identifying Information (*not perfect*)"      );
+
+
+
+        initToggle('ShowLabsFeature',           'ytt-show-labs-feature',          () => { showLabsFeature       = !showLabsFeature; toggleLabsFeature();                                                      }, "Labs Feature",          "AI Search, not to be confused with ai-companion-button"      );
 
         initToggle('DebugMode',                 'ytt-debug-mode',                 () => { debugMode             = !debugMode;                                                                                 }, "DebugMode",             "Console Logs more step by step function calling"             );
         initToggle('LogMetadata',               'ytt-logging',                    () => { enableLogging         = !enableLogging; processVideos();                                                            }, "LogMetadata",           "Console Logs videos metadata loading in the DOM"             );
-
     }
 
 
@@ -1498,6 +1552,9 @@ function checkPerformance(o){const n=performance.now();o();const e=performance.n
       function defaultCalls() {
           toggleStreamerMode();
           toggleUIChecks(); //checks homepage versus watchpage
+
+          toggleLabsFeature();
+
       }
 
 
@@ -1513,6 +1570,10 @@ function checkPerformance(o){const n=performance.now();o();const e=performance.n
           startShelfChecks();
           startItemChecks();
           startItemBadgeChecks();
+
+
+
+
       }
 
       function watchpageCalls() {
@@ -1522,6 +1583,12 @@ function checkPerformance(o){const n=performance.now();o();const e=performance.n
       function channelpageCalls() {
 
       }
+
+      function searchPageCalls() {
+          //toggleLabsFeature();
+      }
+
+
 
       function debugCalls() {
         startToggleChecks();
@@ -1550,6 +1617,10 @@ function checkPerformance(o){const n=performance.now();o();const e=performance.n
                 else if (currentURL.startsWith("https://www.youtube.com/watch?v=")) {
                     watchpageCalls();
                 }
+                else if (currentURL.startsWith("https://www.youtube.com/results?search_query=")) {
+                    searchPageCalls();
+                }
+
             });
             //observer.observe(document.body, { childList: true, subtree: true });
             observer.observe(document.querySelector('ytd-app'), { childList: true, subtree: true });
