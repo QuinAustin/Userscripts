@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Toggles
 // @namespace    Violentmonkey Scripts
-// @version      1.1.2
+// @version      1.1.3
 // @description  Allows disabling a variety of YouTube features
 // @author       -
 // @match        https://www.youtube.com/*
@@ -20,7 +20,7 @@
 Additions:
   added a toggleAskYouTube() function to remove the ai search button in the youtube search bar visible on the homepage. This is a part of the toggleAI button in the menu
 
-  
+
 Removals:
   removed the AI Recommendation Chat Prompt check in the startItemChecks() function. This was done because it had never been properly tested, as the toggle was only completed after YouTube seemed to have stopped testing the feature. And 'Ask YouTube' is the likely final version of what they were attempting to accomplish with ai prompt video recommendations.
 */
