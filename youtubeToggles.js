@@ -16,28 +16,20 @@
 
 
 /*
-1.1.2
+1.1.3
 Additions:
-  the elements; banner, below, recommendations, and comments,  are now using .hidden instead .style.display, as there was inconsistencies with hiding the element.
-  purchased is checked as normal badgeText now, the badge renderer might not exist anymore
-  function made to hide all queries of a given element
-  function to observe a given query, for a condition checked through a passed function. when the condition function returns true, it executes a different function passed through.
+  added a toggleAskYouTube() function to remove the ai search button in the youtube search bar visible on the homepage. This is a part of the toggleAI button in the menu
 
+  
 Removals:
-  url_id #2 is now consolated to return 0, as it is still the homepage, but includes the current youtube event banner (easier to do url checks)
-
-Other Modifications:
-  consistent naming of "url = getURL_id()"
-  toggleAI function was incorrectly using the enableStreamerMode key.
+  removed the AI Recommendation Chat Prompt check in the startItemChecks() function. This was done because it had never been properly tested, as the toggle was only completed after YouTube seemed to have stopped testing the feature. And 'Ask YouTube' is the likely final version of what they were attempting to accomplish with ai prompt video recommendations.
 */
 
 
 /*
 KNOWN BUGS:
-
 -When Guide is turned off, if the first video in a row is under the location where the Guide WOULD be, the video will not autoplay.
   *Temporary Solution: Turning the Guide back on, OR zoom out so the video is no longer under where the Guide's area would be.
-
 */
 
 
@@ -325,21 +317,36 @@ KNOWN BUGS:
     function toggleComments(){hideQuerySelector("#comments",!showComments)}
 
 
-
-    function toggleAI() {
-        const buttons = document.querySelectorAll('#flexible-item-buttons .ytSpecButtonShapeNextHost'); //Next to Save button
-        const enabled = showAI ? '' : 'none';
-        buttons.forEach(query => {
-            if (query.textContent === "Ask") {
-                query.style.display = enabled;
+    function toggleAskYouTube() {
+        const askButton = document.querySelector('#center button')
+        if (askButton) {
+            if(askButton?.textContent === "Ask YouTube") {
+                askButton.hidden = !showAI;
             }
-        })
-
-        toggleQuerySelector("#video-summary",enabled) //AI summary in video descriptions
-        toggleQuerySelector("yt-video-description-youchat-section-view-model",enabled) //gemini button in video description (pulls up a chat window)
-        toggleQuerySelector(".you-chat-entrypoint-button",enabled)                     //gemini button in the video player (pulls up a chat window)
+        }
     }
 
+
+    function toggleAI() {
+
+        if (getURL_id() === 0) {
+            toggleAskYouTube();
+        }
+
+        else {
+            const buttons = document.querySelectorAll('#flexible-item-buttons .ytSpecButtonShapeNextHost'); //Next to Save button
+            const enabled = showAI ? '' : 'none';
+            buttons.forEach(query => {
+                if (query.textContent === "Ask") {
+                    query.style.display = enabled;
+                }
+            })
+
+            toggleQuerySelector("#video-summary",enabled) //AI summary in video descriptions
+            toggleQuerySelector("yt-video-description-youchat-section-view-model",enabled) //gemini button in video description (pulls up a chat window)
+            toggleQuerySelector(".you-chat-entrypoint-button",enabled)                     //gemini button in the video player (pulls up a chat window)
+        }
+    }
 
     function toggleUIChecks() {
         let url = getURL_id();
@@ -348,6 +355,7 @@ KNOWN BUGS:
             //toggleBanner();
             togglePrimaryHeader();
             toggleGuide();
+            toggleAI();
         }
 
         else if(url === 1) { //Check that the user is on a Watchpage
@@ -377,32 +385,36 @@ KNOWN BUGS:
     }
 
 
+    function toggleBanner() {
+      let banner = document.querySelector("ytd-statement-banner-renderer");
+      if (banner) {
+          banner.hidden = !showBanner;
+          let bp = banner.parent
+          if (bp) {
+            bp.hidden = !showBanner;
+          }
+      }
+    }
 
 
     function startShelfChecks() {
         try {
+            toggleBanner();
             const container = getContents();
-
             if (container) {
                 container.querySelectorAll('ytd-rich-section-renderer').forEach(query => {
                     let title = query.querySelector('#title')?.textContent.trim().toLowerCase();
                     let title2 = query.querySelector('span')?.textContent.toLowerCase();
                     //let title2 = query.querySelector('.yt-shelf-header-layout__title')?.textContent.trim().toLowerCase();
                     //let title3 = query.querySelector('yt-shelf-header-layout')?.textContent.toLowerCase();
-                    let banner = query.querySelector("ytd-statement-banner-renderer");
 
 
-                    if (banner) {
-                        banner.hidden = !showBanner;
-                        let bp = banner.parent
-
-                        if (bp) {
-                          bp.hidden = !showBanner;
-                        }
-                    }
 
 
-                    switch (title, title2) { // || title2 || title3) {
+
+
+                const checkTitle = (text) => {
+                    switch(text) {
                         case 'shorts':
                             query.style.display = showShorts ? '' : 'none';
                         break;
@@ -424,15 +436,18 @@ KNOWN BUGS:
                         case 'free primetime movies':
                             query.style.display = showFreeMovies ? '' : 'none';
                         break;
+
                         default:
                             console.info(
-                                "Shelf Titles Found:",
-                                "title  - ", title,
-                                "title2 - ", title2,
-                                //"title3 - ", title3,
+                                "query: ", query,
+                                "\ntitle checked: ", title
                             );
                         break;
                     }
+                }
+                checkTitle(title)
+                checkTitle(title2)
+
                 });
             }
         } //try
@@ -440,6 +455,24 @@ KNOWN BUGS:
             console.error("(startShelfChecks) exception: Failed To Make Changes To Sections | ", e);
         }
     }
+
+  /*
+
+
+
+
+  */
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -457,10 +490,15 @@ KNOWN BUGS:
                     }
                 }
 
-                //AI Recommendation Chat Prompt   (not tested)
-                if (query.querySelector('ytd-talk-to-recs-flow-renderer')) {
-                    query.style.display = showAI ? '' : 'none';
-                }
+
+                /* has not appeared in a long time, likely to be fully replaced with the new "Ask YouTube" search feature
+                    //AI Recommendation Chat Prompt   (not tested)
+                    if (query.querySelector('ytd-talk-to-recs-flow-renderer')) {
+                        query.style.display = showAI ? '' : 'none';
+                    }
+                */
+
+
 
                 //video recommendation prompt that takes over a video spot to say "new to you"
                 const title = query.querySelector('#title')?.textContent.trim().toLowerCase();
@@ -1435,7 +1473,7 @@ KNOWN BUGS:
         initToggle('ShowEndScreenVideos',       'ytt-show-end-screen-videos',     () => { showEndScreenVideos   = !showEndScreenVideos;     toggleEndScreenVideos();                                          }, "End Screen Videos",     "Videos recommended when a video ends"                );
         initToggle('ShowBelow',                 'ytt-show-below',                 () => { showBelow             = !showBelow;               toggleBelow();                                                    }, "Below Player",          "Everything below the video's player"                 );
         initToggle('ShowComments',              'ytt-show-comments',              () => { showComments          = !showComments;            toggleComments();                                                 }, "Comments",              "The entire comment section"                          );
-        initToggle('ShowAI',                    'ytt-show-ai',                    () => { showAI                = !showAI;                  getURL_id() === 0 ? startItemChecks() : toggleAI();               }, "AI Features",           "YouTube's 'AI' features (summaries & buttons)"       );
+        initToggle('ShowAI',                    'ytt-show-ai',                    () => { showAI                = !showAI;                  toggleAI();                                                       }, "AI Features",           "YouTube's 'AI' features (summaries & buttons)"       );
 
 
         initToggle('ShowBanners',               'ytt-show-banners',               () => { showBanner             = !showBanner;              startShelfChecks();                                               }, "Banners",               "Turns on Banners"                                   );
