@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         YouTube Toggles
 // @namespace    Violentmonkey Scripts
-// @version      1.1.3
-// @description  Allows disabling a variety of YouTube features
+// @version      1.1.4
+// @description  Allows hiding a variety of YouTube webpage elements
 // @author       -
 // @match        https://www.youtube.com/*
 // @grant        none
@@ -16,29 +16,40 @@
 
 
 /*
-1.1.3
+1.1.4
 Additions:
-  added a toggleAskYouTube() function to remove the ai search button in the youtube search bar visible on the homepage. This is a part of the toggleAI button in the menu
+added 11 toggles & functions
+    -showCountryCode
+    -showEndButtons (this is further split to 3 individual toggles)
+        -showCreateButton
+        -showNotifications
+        -showPfp
+    -showSubscriptions
+    -showMerchStore
+    -showComments
+    -showCommentingField
+    -showReplyButton
+    -enableExperimental
+These used to be exclusive to the streamer mode toggle, but now they are all seperated into their own individual toggles. Enabling StreamerMode will override and hide the elements.
 
+Can now hide children, without losing them.
 
-Removals:
-  removed the AI Recommendation Chat Prompt check in the startItemChecks() function. This was done because it had never been properly tested, as the toggle was only completed after YouTube seemed to have stopped testing the feature. And 'Ask YouTube' is the likely final version of what they were attempting to accomplish with ai prompt video recommendations.
+Fixed an issue where members only videos were not properly hidden on the watchpage's related content.
+
+experimental toggle for changing the number of videos/shorts per row. This is similar to the BetterZoom toggle, but no zoom required. 
 */
-
 
 /*
 KNOWN BUGS:
 -When Guide is turned off, if the first video in a row is under the location where the Guide WOULD be, the video will not autoplay.
   *Temporary Solution: Turning the Guide back on, OR zoom out so the video is no longer under where the Guide's area would be.
+
+-(unknown cause) shorts will sometimes not be hidden. This is seemingly unrelated to the URL, and refreshing fixes the issue.
 */
-
-
-
 
 
 (function() {
     'use strict';
-
 
     //function checkPerformance(fun) {
     //    const startTime = performance.now()
@@ -59,9 +70,6 @@ KNOWN BUGS:
       console.debug(`Call to ${o.name} took ${e-n} milliseconds`);
     }
 
-
-
-
     function keyAsBool(keyName) {
       if (localStorage.getItem(keyName) === "true") {
         return true;
@@ -76,8 +84,6 @@ KNOWN BUGS:
       return keyAsBool(keyName); //return the value of the key as a boolean
     }
 
-
-
     function flipKey(keyName) {
       const val = localStorage.getItem(keyName); //string "true"
       if (val === "true") {
@@ -90,26 +96,41 @@ KNOWN BUGS:
 
 
 
-
+/*
+ *  Guide for making a new toggle:
+ *  1. add a variable
+ *  2. add a createToggle()
+ *  3. add a initToggle()
+ *  4. make sure init toggle is calling the appropriate function for the new toggle
+ */
 
   //This is for example purposes
     let showToggle            = declareKey('ytt-show-toggle', false);
-
-  /*======================================================
-   *        HOME PAGE TOGGLES
-   *======================================================*/
 //Core UI
+/*======================================================
+*        GLOBAL TOGGLES
+*======================================================*/
+    let showCountryCode         = declareKey('ytt-show-country-code'  , true);
+    let showAI                  = declareKey('ytt-show-ai'            , true);
+    let showEndButtons          = declareKey('ytt-show-end-buttons'   , true);
+        let showCreateButton        = declareKey('ytt-show-create-button' , true);
+        let showNotifications       = declareKey('ytt-show-notifications' , true);
+        let showPfp                 = declareKey('ytt-show-pfp'           , true);
+/*======================================================
+*        HOME PAGE TOGGLES
+*======================================================*/
     let showPrimaryHeader       = declareKey("ytt-show-primary-header"        , true);
     let showGuide               = declareKey('ytt-show-guide'                 , true);
-    let showBanner              = declareKey('ytt-show-banners'                , true);
+        let showSubscriptions       = declareKey('ytt-show-subscriptions'         , true);
+
 //Blocks of Content
+    let showBanner              = declareKey('ytt-show-banners'               , true);
     let showShorts              = declareKey('ytt-show-shorts'                , true);
     let showGames               = declareKey('ytt-show-games'                 , true);
     let showBreakingNews        = declareKey('ytt-breaking-news'              , true);
     let showPosts               = declareKey('ytt-show-posts'                 , true);
     let showExploreMoreTopics   = declareKey('ytt-show-explore-more-topics'   , true);
     let showWhatDidYouThink     = declareKey('ytt-what-did-you-think'         , true);
-
 
 //Types of Videos
     let showMusic               = declareKey('ytt-show-music'                 , true);
@@ -121,28 +142,29 @@ KNOWN BUGS:
     let showMemberOnly          = declareKey('ytt-show-member-only'           , true);
     let showSponsored           = declareKey('ytt-show-sponsored'             , true);
     let showLivestreams         = declareKey('ytt-show-livestreams'           , true);
-  /*======================================================
-   *        WATCH PAGE TOGGLES
-   *======================================================*/
+/*======================================================
+*        WATCH PAGE TOGGLES
+*======================================================*/
 //Core UI
     let showRecommedations      = declareKey('ytt-show-recommendations'        , true);
     let showEndScreenVideos     = declareKey('ytt-show-end-screen-videos'      , true);
     let showBelow               = declareKey('ytt-show-below'                  , true);
-    let showComments            = declareKey('ytt-show-comments'               , true);
-    let showAI                  = declareKey('ytt-show-ai'                     , true);
+        let showDescription         = declareKey('ytt-show-description'            , true);
+        let showMerchStore          = declareKey('ytt-show-merch-store'            , true);
+        let showComments            = declareKey('ytt-show-comments'               , true);
+            let showCommentingField     = declareKey('ytt-show-commenting-field'       , true);
+            let showReplyButton         = declareKey('ytt-show-reply-button'           , true);
 
-  /*======================================================
-   *        DEVELOPER TOGGLES
-   *======================================================*/
+/*======================================================
+*        DEVELOPER TOGGLES
+*======================================================*/
 //Developer Tool Toggles
+    //let debugMode               = declareKey('ytt-debug-mode'                     , false);
     let enableBetterZoom        = declareKey('ytt-enable-better-zoom'             , false);
     let enableStreamerMode      = declareKey('ytt-enable-streamer-mode'           , false);
     let showLabsFeature         = declareKey('ytt-show-labs-feature'              , false);
-    let debugMode               = declareKey('ytt-debug-mode'                     , false);
     let enableLogging           = declareKey('ytt-logging'                        , false);
-
-
-
+    let enableExperimental      = declareKey('ytt-enable-experimental'            , false);
 
 
 
@@ -154,7 +176,31 @@ KNOWN BUGS:
     */
 
     function toggleQuerySelector(e,t){const o=document.querySelector(e);o&&(o.style.display=t)}
-    function hideQuerySelector(e,t){const o=document.querySelector(e);o&&(o.hidden=t)}
+    function hideQuerySelector(e,t){const o=document.querySelector(e);o&&(o.hidden=t)} //checks if element exists before hiding it
+
+
+  //if child 0 is hidden and child 1 is not, child 1 will become child 0. use style.display = '':'none'
+
+  //function hideQuerySelectorChild(e,n,t){const o=document.querySelector(e);if(o){const e=o.children[n];e&&(e.hidden=n)}}
+   // function hideQuerySelectorChild(element, number, toggle) {
+   //   const selector = document.querySelector(element);
+   //   if (selector) {
+   //       const child = selector.children[number]
+   //       if (child) {
+   //         child.hidden = toggle;
+   //       }
+   //   }
+   // }
+
+  function toggleQuerySelectorChild(e,n,t) {
+    const selector = document.querySelector(e);
+    if (selector) {
+      const child = selector.children[n];
+      if (child) {
+        child.style.display = t ? 'none' : '';
+      }
+    }
+  }
 
     function hideQuerySelectorAll(element,toggle) {
       document.querySelectorAll(element).forEach(query => {
@@ -234,7 +280,27 @@ KNOWN BUGS:
 
 
   function toggleLabsFeature() {
+      //This is blocking channels
 
+      /*
+       * get the channel name attached to video element
+       * compare channel name against list of blocked channel names
+       * if channel name is blocked, hide video
+       *
+       *
+       * check blocked channel expiration time (the idea here would be that channels get blocked for around a week, that way it has time to cycle out, without having to think about removing them)
+       *    this could potentially have further storage of a blocked counter, i.e this channel was blocked a second time, lets increase the expiration to 1 month. so 1st time = 1 week, 2nd time = 1 month, 3 times = one year (maybe less)
+       *
+       *
+       *
+       * other idea, a dedicated one click button to send the "don't recommend channel" button
+       */
+
+
+
+
+
+    /*
       //looking for a button with an aria-label "Search using AI Mode"
       const center = document.querySelector("#center");
       const AISearchButton =  center.querySelector('[aria-label="Search using AI Mode"]');
@@ -257,6 +323,7 @@ KNOWN BUGS:
               AIChip.style.display = showLabsFeature ? "" : "none";
           }
       }
+    */
   }
 
 
@@ -272,7 +339,8 @@ KNOWN BUGS:
                 return document.querySelector('ytd-rich-item-renderer').parentElement;
               break;
               case 1: //Watchpage
-                return document.querySelector('yt-lockup-view-model').parentElement;
+                return document.querySelector('#secondary yt-lockup-view-model').parentElement;
+                //return document.querySelector('yt-lockup-view-model').parentElement;
               break;
               default:
                 console.info("Url not used in GetContents: ",url);
@@ -309,7 +377,11 @@ KNOWN BUGS:
 
 
     function toggleBelow(){hideQuerySelector("#below",!showBelow)}
-    function toggleRecommendations(){hideQuerySelector("#related",!showRecommedations)}
+    function toggleRecommendations()  {
+      if (!enableStreamerMode) { //disabled by streamer mode
+          hideQuerySelector("#related",!showRecommedations)
+      }
+    }
     function toggleEndScreenVideos(){
       hideQuerySelector(".ytp-fullscreen-grid-stills-container",!showEndScreenVideos)
       hideQuerySelectorAll('.ytp-ce-video', !showEndScreenVideos)
@@ -322,6 +394,10 @@ KNOWN BUGS:
         if (askButton) {
             if(askButton?.textContent === "Ask YouTube") {
                 askButton.hidden = !showAI;
+            }
+            const text = document.querySelector('#center textarea')
+            if (text.placeholder == "Search or ask a question") {
+                text.placeholder = "Search";
             }
         }
     }
@@ -341,10 +417,10 @@ KNOWN BUGS:
                     query.style.display = enabled;
                 }
             })
-
-            toggleQuerySelector("#video-summary",enabled) //AI summary in video descriptions
-            toggleQuerySelector("yt-video-description-youchat-section-view-model",enabled) //gemini button in video description (pulls up a chat window)
-            toggleQuerySelector(".you-chat-entrypoint-button",enabled)                     //gemini button in the video player (pulls up a chat window)
+            toggleQuerySelector('ytd-menu-service-item-renderer', enabled); //gemini button in the video's 3 dot button's submenu [right of the share button] p.s. this gets unhidden every time the menu is reopened, so it needs a display change
+            toggleQuerySelector('#video-summary',enabled) //AI summary in video descriptions
+            toggleQuerySelector('yt-video-description-youchat-section-view-model',enabled) //gemini button in video description (pulls up a chat window)
+            toggleQuerySelector('.you-chat-entrypoint-button',enabled)                     //gemini button in the video player (pulls up a chat window)
         }
     }
 
@@ -407,11 +483,6 @@ KNOWN BUGS:
                     let title2 = query.querySelector('span')?.textContent.toLowerCase();
                     //let title2 = query.querySelector('.yt-shelf-header-layout__title')?.textContent.trim().toLowerCase();
                     //let title3 = query.querySelector('yt-shelf-header-layout')?.textContent.toLowerCase();
-
-
-
-
-
 
                 const checkTitle = (text) => {
                     switch(text) {
@@ -1134,6 +1205,146 @@ KNOWN BUGS:
 
 
 
+  //new toggles
+
+  /*
+   *
+   *
+   * toggle createButton //this one makes sense, because most people will never use this
+   * toggle MerchStore //People complain about this showing up
+   * the rest can probably stay for now under the streamerMode
+   *
+   *
+   *
+   *
+  */
+
+
+
+
+    function toggleCountryCode() {
+      if (!enableStreamerMode) {
+          hideQuerySelector('#country-code', !showCountryCode);
+      }
+    }
+
+    function toggleCreateButton() {
+      if (!enableStreamerMode) {
+          toggleQuerySelectorChild('#end #buttons', 0, !showCreateButton);
+      }
+    }
+    function toggleNotificationButton() {
+      if (!enableStreamerMode) {
+          toggleQuerySelectorChild('#end #buttons', 1, !showNotifications);
+      }
+    }
+    function togglePFP() {
+      if (!enableStreamerMode) {
+          toggleQuerySelectorChild('#end #buttons', 2, !showPfp);
+      }
+    }
+    function toggleEndButtons() {
+      if (!enableStreamerMode) {
+          document.querySelector('#end #buttons').hidden = !showEndButtons;
+      }
+
+    }
+    function toggleSubscriptions() {
+      if (!enableStreamerMode) {
+          document.querySelector('ytd-guide-section-renderer:nth-child(2)').hidden = !showSubscriptions;
+      }
+    }
+
+
+
+    function toggleMerchStore() {
+        if (!enableStreamerMode) { //disabled by streamer mode
+            //document.querySelector('ytd-merch-shelf-renderer').hidden = !showMerchStore;
+            hideQuerySelectorAll('ytd-merch-shelf-renderer', !showMerchStore);
+        }
+    }
+
+    function toggleCommentingField() {
+        if (!enableStreamerMode) {  //disabled by streamer mode
+            //document.querySelector('ytd-comment-simplebox-renderer').hidden = !showCommentingField;
+            hideQuerySelector('ytd-comment-simplebox-renderer', !showCommentingField);
+        }
+    }
+    function toggleReplyButton() { //NO TOGGLE EXISTS FOR THIS YET
+        if (!enableStreamerMode) {
+            //document.querySelector('#reply-button-end').hidden = false;//!showReplyButton;
+            hideQuerySelectorAll('#reply-button-end', !showReplyButton);
+        }
+
+    }
+
+
+
+
+
+
+
+    function setItemsPerRow(number) {
+                const container = document.querySelector('ytd-rich-grid-renderer');
+                if (container) {
+                    container.style.setProperty('--ytd-rich-grid-items-per-row', (number));
+                }
+
+                //shelfs seem to make their own properties, or they have a different parent that was not found, so each shelf is checked
+                const container2 = document.querySelectorAll('ytd-rich-shelf-renderer');
+                if (container2) {
+                    container2.forEach(query => {
+                        query.style.setProperty('--ytd-rich-grid-items-per-row', (number));
+                        console.debug(query.style.getPropertyValue('--ytd-rich-grid-items-per-row'));
+                    });
+                }
+
+
+
+                //document.documentElement.style.fontSize = (10 + difference*2) + "px";
+    }
+
+    function resetItemsPerRow() {
+        const container = document.querySelector('ytd-rich-grid-renderer');
+        if (container) {
+            container.style.setProperty('--ytd-rich-grid-items-per-row', container.elementsPerRow); //elementsPerRow is a YouTube specific attribute 
+            console.debug("elements per row: ", container.elementsPerRow)
+            //container.style.setProperty('--ytd-rich-grid-items-per-row', '');
+        }
+        const container2 = document.querySelectorAll('ytd-rich-shelf-renderer');
+        if (container2) {
+            container2.forEach(query => {
+                query.style.setProperty('--ytd-rich-grid-items-per-row', (6));
+                console.debug("property value: ", Math.round(container.style.getPropertyValue('--ytd-rich-grid-items-per-row')*1.5));
+            });
+            
+        }
+    }
+
+    function toggleExperimental() {
+        console.debug("experimental toggle flipped", enableExperimental);
+        const value = localStorage.getItem('ytt-experimental-value');
+        console.debug("experimental value: ", value);
+        if (enableExperimental) { 
+            setItemsPerRow(value);
+        }
+        else {
+            resetItemsPerRow();
+        }
+    }
+
+
+
+
+
+    /*Streamer mode disables the following toggles from working
+     *
+     * toggleMerchStore
+     * toggleRecommendations
+     *
+     *
+     *
+    */
 
 
 
@@ -1141,20 +1352,56 @@ KNOWN BUGS:
         const enabled = enableStreamerMode ? 'none' : '';
             try {
 
+
+
                 //Top Priority | The page loading is enough to see it
-                toggleGetElementById('country-code', enabled);                           //toggle users country abbreviation on the top left YouTube logo | reveals location of user
-                toggleQuerySelector('#end #buttons', enabled)                            //toggle user profile picture (as well as create button and notifications) | profile picture is the only reason for such a high priority
-                toggleQuerySelector('ytd-guide-section-renderer:nth-child(2)', enabled); //toggle subscriptions on the left side menu on the homepage | Subscriptions can reveal channels that are either local to where a user lives, or talk about personal topics and beliefs
+                enabled?toggleGetElementById('country-code', enabled):toggleCountryCode();                           //toggle users country abbreviation on the top left YouTube logo | reveals location of user
+                enabled?toggleQuerySelector('#end #buttons', enabled):toggleEndButtons();                            //toggle user profile picture (as well as create button and notifications) | profile picture is the only reason for such a high priority
+                enabled||(toggleCreateButton(),toggleNotificationButton(),togglePFP());
+
+
+                enabled?toggleQuerySelector('ytd-guide-section-renderer:nth-child(2)', enabled):toggleGuide(); //toggle subscriptions on the left side menu on the homepage | Subscriptions can reveal channels that are either local to where a user lives, or talk about personal topics and beliefs
 
 
 
                 //Medium Priority | User has to give input (scrolling) to see it
-                toggleQuerySelectorAll('ytd-merch-shelf-renderer', enabled);             //toggle Merch Under Videos      | reveals account's currency, which reveals location
-                toggleQuerySelector('ytd-comment-simplebox-renderer', enabled);          //toggle Commenting Under Videos | reveals profile picture, and name if something is submitted
+
+
+
+                if (getURL_id() === 1) { //WATCHPAGE ONLY
+                    //MERCH STORE
+                    //enabled?document.querySelector('ytd-merch-shelf-renderer').hidden=enabled:toggleMerchStore();
+                    enabled?hideQuerySelectorAll('ytd-merch-shelf-renderer', enabled):toggleMerchStore(); //at least two different store elements
+
+
+
+
+                    //RECOMMENDATIONS
+                    //enabled?document.querySelector('#related').hidden=enabled:toggleRecommendations();
+                    enabled?hideQuerySelector('#related', enabled):toggleRecommendations();
+                    //COMMENTING
+                    //enabled?document.querySelector('ytd-comment-simplebox-renderer').hidden=enabled:toggleCommentingField(); //toggleQuerySelector('ytd-comment-simplebox-renderer', enabled);          //toggle Commenting Under Videos | reveals profile picture, and name if something is submitted
+                    enabled?hideQuerySelector('ytd-comment-simplebox-renderer', enabled):toggleCommentingField();
+                    //REPLY BUTTON
+                    enabled?hideQuerySelector('#reply-button-end', enabled):toggleReplyButton();
+                    //toggleQuerySelectorAll('#reply-button-end', enabled);                    //remove reply button in comments | reveals profile picture, and name if something is submitted
+                }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
                 //Low Priority | User has to hover or click something outside of common areas to see it
-                toggleQuerySelectorAll('#reply-button-end', enabled);                    //remove reply button in comments | reveals profile picture, and name if something is submitted
 
 
                 //remove items from the left side bar
@@ -1177,6 +1424,7 @@ KNOWN BUGS:
                 });
               const container = getContents()
             } catch (e) {
+                console.debug(e);
                 setTimeout("streamer mode failed...retrying",toggleStreamerMode, 50);
             }
     }
@@ -1214,8 +1462,8 @@ KNOWN BUGS:
                 }
                 document.documentElement.style.fontSize = (10 + difference*2) + "px";
             }
-
     }
+
     function homepageZoomOff() {
         const base = 4;
         const container = document.querySelector('ytd-rich-grid-renderer');
@@ -1307,57 +1555,52 @@ KNOWN BUGS:
 
 
     function populateMenuContainer(menuContainer) {
-
-
         const createLabel = (labelText, fontSize) => {
             const wrapper = document.createElement('div');
             wrapper.style.display = 'flex';
             wrapper.style.alignItems = 'center';
             wrapper.style.marginBottom = '5px';
-
             const label = document.createElement('label');
             label.textContent = labelText;
             label.style.marginLeft = '0px';
             label.style.fontSize = fontSize;
             label.style.fontWeight = 'bold';
             wrapper.appendChild(label);
-
             return wrapper;
         };
-
-
 
         const createToggle = (toggleName) => {
             let toggle = document.createElement(toggleName);
             toggle.id="options"
             toggle.className="style-scope ytd-settings-options-renderer"
             toggle.style.marginLeft = '25px';
-
-
-
             let ytd_settings_switch_renderer = document.createElement('ytd-settings-switch-renderer');
             ytd_settings_switch_renderer.className = "style-scope ytd-settings-options-renderer";
             ytd_settings_switch_renderer.style.margin = '0px';
             toggle.appendChild(ytd_settings_switch_renderer);
-
             return toggle;
         };
 
 
-
-        //This is for example purposes
-        if (debugMode) {
-          menuContainer.appendChild(createToggle('ShowToggle'));
-        }
-
-      /*======================================================
-       *        HOME PAGE TOGGLES
-       *======================================================*/
-        menuContainer.append(
-          createLabel("Homepage Toggles", '15px'),
-            createLabel("Core UI", '10px'),
-              createToggle('ShowPrimaryHeader'),
-              createToggle('ShowGuide'),
+      menuContainer.append(
+/*======================================================
+*        GLOBAL TOGGLES
+*======================================================*/
+        createLabel("Global Toggles", "15px"),
+          createLabel("Core UI", '10px'),
+            createToggle('showCountryCode'),
+            createToggle('ShowAI'),
+            createToggle('showEndButtons'),
+                createToggle('showCreateButton'),
+                createToggle('showNotifications'),
+                createToggle('showPfp'),
+/*======================================================
+*        HOME PAGE TOGGLES
+*======================================================*/
+        createLabel("Homepage Toggles", '15px'),
+            createToggle('ShowPrimaryHeader'),
+            createToggle('ShowGuide'),
+                createToggle('showSubscriptions'),
             createLabel("Blocks of Content", '10px'),
               createToggle('ShowBanners'),
               createToggle('ShowShorts'),
@@ -1375,7 +1618,7 @@ KNOWN BUGS:
               createToggle('ShowFreeMovies'),
               createToggle('ShowMemberOnly'),
               createToggle('ShowSponsored'),
-              createToggle('showLivestreams'),
+              createToggle('ShowLivestreams'),
       /*======================================================
        *        WATCH PAGE TOGGLES
        *======================================================*/
@@ -1384,31 +1627,29 @@ KNOWN BUGS:
               createToggle('ShowRecommendations'),
               createToggle('ShowEndScreenVideos'),
               createToggle('ShowBelow'),
-              createToggle('ShowComments'),
-              createToggle('ShowAI'),
+              createToggle('ShowMerchStore'),
+                createToggle('ShowComments'),
+                    createToggle('ShowCommentingField'),
+                    createToggle('showReplyButton'),
       /*======================================================
        *        DEVELOPER TOGGLES
        *======================================================*/
           createLabel("Developer Tool Toggles", '15px'),
+          //createToggle('DebugMode'),
             createLabel("Experimental Toggles", '10px'),
               createToggle('EnableBetterZoom'),
               createToggle('EnableStreamerMode'),
               createToggle('ShowLabsFeature'),
+              createToggle('enableExperimental'),
             createLabel("Console Logs", '10px'),
-              createToggle('DebugMode'),
               createToggle('LogMetadata'),
         );
-
-
         document.body.appendChild(menuContainer);
     }
 
 
 
     function initializeToggleButtons() {
-
-
-
         const initToggle = (toggleName, key, onChange, title, subtitle) => {
             const toggle = document.querySelector(toggleName);
             const toggleButton = toggle.querySelector('tp-yt-paper-toggle-button');
@@ -1437,10 +1678,8 @@ KNOWN BUGS:
 
 
 
-
         const inputField = (toggleName, key) => {   //This is really only for the WatchedPercent variable, so function might need a new 'default value' parameter
-            let toggle = document.querySelector(toggleName);
-            let toggleSubtitle = toggle.querySelector('#subtitle');
+            let toggleSubtitle = document.querySelector(toggleName).querySelector('#subtitle');
             let input = document.createElement("input");
             input.type = "number";
             input.id   = "maxWatchProgress";
@@ -1451,64 +1690,95 @@ KNOWN BUGS:
             if (input.value === "") {
                 input.value = localStorage.setItem(key, 100);
             }
+            //""===input.value&&(input.value=localStorage.setItem(t,100)),
             input.addEventListener('change', () => {
                 localStorage.setItem(key, input.value);
             });
             toggleSubtitle.appendChild(input);
         }
 
-        //This is for example purposes
-        if (debugMode) {
-          initToggle('ShowToggle','ytt-show-toggle',()=>{showToggle=!showToggle,startToggleChecks()},"This is a title","This is a subtitle");
 
-
-          //inputField('ShowToggle', 'ytt-show-toggle-field-variable');
+        const _inputField = (toggleName, key, dv, type, id) => {
+            let toggleSubtitle = document.querySelector(toggleName).querySelector('#subtitle');
+            let input = document.createElement("input");
+            input.type = type;
+            input.id   = id;
+            input.name = id;
+            //input.min  = "0";
+            //input.max  = "100";
+            input.value = localStorage.getItem(key);
+            if (input.value === "") { //field key has no value
+                input.value = localStorage.setItem(key, dv);
+            }
+            input.addEventListener('change', () => {
+                localStorage.setItem(key, input.value);
+            });
+            toggleSubtitle.appendChild(input);
         }
 
-        initToggle('ShowPrimaryHeader',         'ytt-show-primary-header',        () => { showPrimaryHeader     = !showPrimaryHeader;       togglePrimaryHeader();                                            }, "Primary Header",   "Tag header above homepage recommendations"                );
-        initToggle('ShowGuide',                 'ytt-show-guide',                 () => { showGuide             = !showGuide;               toggleGuide();                                                    }, "Guide",            "The left side (Subscriptions, You, Explore, etc.)"        );
-
-
-        initToggle('ShowRecommendations',       'ytt-show-recommendations',       () => { showRecommedations    = !showRecommedations;      toggleRecommendations();                                          }, "Recommendations",       "Recommendation section on video watchpages"          );
-        initToggle('ShowEndScreenVideos',       'ytt-show-end-screen-videos',     () => { showEndScreenVideos   = !showEndScreenVideos;     toggleEndScreenVideos();                                          }, "End Screen Videos",     "Videos recommended when a video ends"                );
-        initToggle('ShowBelow',                 'ytt-show-below',                 () => { showBelow             = !showBelow;               toggleBelow();                                                    }, "Below Player",          "Everything below the video's player"                 );
-        initToggle('ShowComments',              'ytt-show-comments',              () => { showComments          = !showComments;            toggleComments();                                                 }, "Comments",              "The entire comment section"                          );
-        initToggle('ShowAI',                    'ytt-show-ai',                    () => { showAI                = !showAI;                  toggleAI();                                                       }, "AI Features",           "YouTube's 'AI' features (summaries & buttons)"       );
-
-
-        initToggle('ShowBanners',               'ytt-show-banners',               () => { showBanner             = !showBanner;              startShelfChecks();                                               }, "Banners",               "Turns on Banners"                                   );
-        initToggle('ShowShorts',                'ytt-show-shorts',                () => { showShorts             = !showShorts;              startShelfChecks();                                               }, "Shorts",                "Homepage Shorts"                                    );
-        initToggle('ShowGames',                 'ytt-show-games',                 () => { showGames              = !showGames;               startShelfChecks();                                               }, "Playables",             "Homepage Games"                                     );
-        initToggle('ShowBreakingNews',          'ytt-breaking-news',              () => { showBreakingNews       = !showBreakingNews;        startShelfChecks();                                               }, "Breaking News",         "Breaking News On"                                   );
-        initToggle('ShowPosts',                 'ytt-show-posts',                 () => { showPosts              = !showPosts;               startShelfChecks();                                               }, "Creator Posts",         "Creator Posts On"                                   );
-        initToggle('ShowExploreMoreTopics',     'ytt-show-explore-more-topics',   () => { showExploreMoreTopics  = !showExploreMoreTopics;   startShelfChecks();                                               }, "Explore More Topics",   "Explore Topics On"                                  );
-        initToggle('ShowWhatDidYouThink',       'ytt-what-did-you-think',         () => { showWhatDidYouThink    = !showWhatDidYouThink;     startShelfChecks();                                               }, "Rating Videos",         "The 'What did you think of this video?' messages"   );
 
 
 
-        initToggle('ShowMusic',                 'ytt-show-music',                 () => { showMusic             = !showMusic;               startItemBadgeChecks();                                           }, "Music",                 "Music in video format"                                       );
-        initToggle('ShowPlaylistsandPodcasts',  'ytt-show-playlists',             () => { showPlaylists         = !showPlaylists;           startItemChecks();                                                }, "Playlists & Podcasts",  "Turns on Playlists & Podcasts"                               );
-        initToggle('ShowNewToYouMessage',       'ytt-show-new-to-you',            () => { showNewToYou          = !showNewToYou;            startItemChecks();                                                }, "New To You Message",    "Turns on New To You / Looking for something different Message"                                 );
-        initToggle('ShowWatchedVideos',         'ytt-show-watched',               () => { showWatched           = !showWatched;             getURL_id()===0 ? processVideos() : startVideoChecks();           }, "Watched Videos",        "(When off) Videos Above This Watch Percentage Are Hidden: "  );
-            inputField('ShowWatchedVideos',     'ytt-max-watch-percent');
-
-        initToggle('ShowPurchasedVideos',       'ytt-show-purchased',             () => { showPurchased         = !showPurchased;           startItemBadgeChecks();                                           }, "Purchased Videos",      "Turns on Purchased Videos"                                   );
-        initToggle('ShowFreeMovies',            'ytt-show-free-movies',           () => { showFreeMovies        = !showFreeMovies;          startItemBadgeChecks() /*getURL_id() === 0 ? startItemBadgeChecks() : startVideoChecks();*/  }, "Free Movies",           "Turns on Free & Primetime Movies" );
-
-        initToggle('ShowMemberOnly',            'ytt-show-member-only',           () => { showMemberOnly        = !showMemberOnly;          startItemBadgeChecks();                                           }, "Member Only",           "Turns on Members Only Videos"                                );
-        initToggle('ShowSponsored',             'ytt-show-sponsored',             () => { showSponsored         = !showSponsored;           startItemBadgeChecks();                                           }, "Sponsored",             "Turns on Sponsored Video Ads"                                );
-        initToggle('showLivestreams',           'ytt-show-livestreams',           () => { showLivestreams       = !showLivestreams;         startItemBadgeChecks();                                           }, "Livestreams",           "Turns on Livestreams"                                        );
-
-
-        initToggle('EnableBetterZoom',          'ytt-enable-better-zoom',         () => { enableBetterZoom      = !enableBetterZoom;        getURL_id()===0&&enableBetterZoom?homepageZoomOn():homepageZoomOff(); }, "Better Zoon",       "Allows content to fill the screen better when zooming out"   );                                                                                                                               /*if (getURL_id() === 0 && enableBetterZoom) {homepageZoomOn();} else{homepageZoomOff();}*/
-        initToggle('EnableStreamerMode',        'ytt-enable-streamer-mode',       () => { enableStreamerMode    = !enableStreamerMode;      toggleStreamerMode();                                                 }, "Streamer Mode",     "Tries Removing Identifying Information (*not perfect*)"      );
 
 
 
-        initToggle('ShowLabsFeature',           'ytt-show-labs-feature',          () => { showLabsFeature       = !showLabsFeature; toggleLabsFeature();                                                      }, "Labs Feature",          "AI Search, not to be confused with ai-companion-button"      );
-
-        initToggle('DebugMode',                 'ytt-debug-mode',                 () => { debugMode             = !debugMode;                                                                                 }, "DebugMode",             "Console Logs more step by step function calling"             );
-        initToggle('LogMetadata',               'ytt-logging',                    () => { enableLogging         = !enableLogging; processVideos();                                                            }, "LogMetadata",           "Console Logs videos metadata loading in the DOM"             );
+        //This is for example purposes
+        //if (debugMode) {
+        //    initToggle('ShowToggle','ytt-show-toggle',()=>{showToggle=!showToggle,startToggleChecks()},"This is a title","This is a subtitle");
+        //  //inputField('ShowToggle', 'ytt-show-toggle-field-variable');
+        //}
+/*======================================================
+*        GLOBAL TOGGLES
+*======================================================*/
+        initToggle('showCountryCode'           ,'ytt-show-country-code'          ,() => { showCountryCode         = !showCountryCode         ;toggleCountryCode()            ;}, "Country Code"          ,"top right of YouTube Logo"             );
+        initToggle('ShowAI'                    ,'ytt-show-ai'                    ,() => { showAI                  = !showAI                  ;toggleAI()                     ;}, "AI Features"           ,"'AI' search, summaries, and buttons"   );
+        initToggle('showEndButtons'            ,'ytt-show-end-buttons'           ,() => { showEndButtons          = !showEndButtons          ;toggleEndButtons()             ;}, "End Buttons"           ,"all buttons on the end"                );
+         initToggle('showCreateButton'         ,'ytt-show-create-button'         ,() => { showCreateButton        = !showCreateButton        ;toggleCreateButton()           ;}, "Create Button"         ,"button to create videos"               );
+         initToggle('showNotifications'        ,'ytt-show-notifications'         ,() => { showNotifications       = !showNotifications       ;toggleNotificationButton()     ;}, "notification button"   ,"notification in the top right"         );
+         initToggle('showPfp'                  ,'ytt-show-pfp'                   ,() => { showPfp                 = !showPfp                 ;togglePFP()                    ;}, "PFP"                   ,"show profile picture button"           );
+/*======================================================
+*        HOME PAGE TOGGLES
+*======================================================*/
+        initToggle('ShowPrimaryHeader'         ,'ytt-show-primary-header'        ,() => { showPrimaryHeader     = !showPrimaryHeader       ;togglePrimaryHeader()                                            ;}, "Primary Header"        ,"Tag header above homepage recommendations"                       );
+        initToggle('ShowGuide'                 ,'ytt-show-guide'                 ,() => { showGuide             = !showGuide               ;toggleGuide()                                                    ;}, "Guide"                 ,"The left side (Subscriptions, You, Explore, etc.)"               );
+         initToggle('showSubscriptions'        ,'ytt-show-subscriptions'         ,() => { showSubscriptions     = !showSubscriptions       ;toggleSubscriptions()                                            ;}, "Subscriptions"         ,"Homepage subscriptions on the left guide"                        );
+        initToggle('ShowBanners'               ,'ytt-show-banners'               ,() => { showBanner            = !showBanner              ;startShelfChecks()                                               ;}, "Banners"               ,"Turns on Banners"                                                );
+        initToggle('ShowShorts'                ,'ytt-show-shorts'                ,() => { showShorts            = !showShorts              ;startShelfChecks()                                               ;}, "Shorts"                ,"Homepage Shorts"                                                 );
+        initToggle('ShowGames'                 ,'ytt-show-games'                 ,() => { showGames             = !showGames               ;startShelfChecks()                                               ;}, "Playables"             ,"Homepage Games"                                                  );
+        initToggle('ShowBreakingNews'          ,'ytt-breaking-news'              ,() => { showBreakingNews      = !showBreakingNews        ;startShelfChecks()                                               ;}, "Breaking News"         ,"Breaking News On"                                                );
+        initToggle('ShowPosts'                 ,'ytt-show-posts'                 ,() => { showPosts             = !showPosts               ;startShelfChecks()                                               ;}, "Creator Posts"         ,"Creator Posts On"                                                );
+        initToggle('ShowExploreMoreTopics'     ,'ytt-show-explore-more-topics'   ,() => { showExploreMoreTopics = !showExploreMoreTopics   ;startShelfChecks()                                               ;}, "Explore More Topics"   ,"Explore Topics On"                                               );
+        initToggle('ShowWhatDidYouThink'       ,'ytt-what-did-you-think'         ,() => { showWhatDidYouThink   = !showWhatDidYouThink     ;startShelfChecks()                                               ;}, "Rating Videos"         ,"The 'What did you think of this video?' messages"                );
+        initToggle('ShowMusic'                 ,'ytt-show-music'                 ,() => { showMusic             = !showMusic               ;startItemBadgeChecks()                                           ;}, "Music"                 ,"Music in video format"                                           );
+        initToggle('ShowPlaylistsandPodcasts'  ,'ytt-show-playlists'             ,() => { showPlaylists         = !showPlaylists           ;startItemChecks()                                                ;}, "Playlists & Podcasts"  ,"Turns on Playlists & Podcasts"                                   );
+        initToggle('ShowNewToYouMessage'       ,'ytt-show-new-to-you'            ,() => { showNewToYou          = !showNewToYou            ;startItemChecks()                                                ;}, "New To You Message"    ,"Turns on New To You / Looking for something different Message"   );
+        initToggle('ShowWatchedVideos'         ,'ytt-show-watched'               ,() => { showWatched           = !showWatched             ;getURL_id()===0 ? processVideos() : startVideoChecks()           ;}, "Watched Videos"        ,"(When off) Videos Above This Watch Percentage Are Hidden: "      );
+            inputField('ShowWatchedVideos'     ,'ytt-max-watch-percent');
+        initToggle('ShowPurchasedVideos'       ,'ytt-show-purchased'             ,() => { showPurchased         = !showPurchased           ;startItemBadgeChecks()                                           ;}, "Purchased Videos"      ,"Turns on Purchased Videos"           );
+        initToggle('ShowFreeMovies'            ,'ytt-show-free-movies'           ,() => { showFreeMovies        = !showFreeMovies          ;startItemBadgeChecks()                                           ;}, "Free Movies"           ,"Turns on Free & Primetime Movies"    );
+        initToggle('ShowMemberOnly'            ,'ytt-show-member-only'           ,() => { showMemberOnly        = !showMemberOnly          ;startItemBadgeChecks()                                           ;}, "Member Only"           ,"Turns on Members Only Videos"        );
+        initToggle('ShowSponsored'             ,'ytt-show-sponsored'             ,() => { showSponsored         = !showSponsored           ;startItemBadgeChecks()                                           ;}, "Sponsored"             ,"Turns on Sponsored Video Ads"        );
+        initToggle('ShowLivestreams'           ,'ytt-show-livestreams'           ,() => { showLivestreams       = !showLivestreams         ;startItemBadgeChecks()                                           ;}, "Livestreams"           ,"Turns on Livestreams"                );
+/*======================================================
+*        WATCH PAGE TOGGLES
+*======================================================*/
+        initToggle('ShowRecommendations'       ,'ytt-show-recommendations'       ,() => { showRecommedations    = !showRecommedations      ;toggleRecommendations()                                          ;}, "Recommendations"       ,"Recommendation section on video watchpages"          );
+        initToggle('ShowEndScreenVideos'       ,'ytt-show-end-screen-videos'     ,() => { showEndScreenVideos   = !showEndScreenVideos     ;toggleEndScreenVideos()                                          ;}, "End Screen Videos"     ,"Videos recommended when a video ends"                );
+        initToggle('ShowBelow'                 ,'ytt-show-below'                 ,() => { showBelow             = !showBelow               ;toggleBelow()                                                    ;}, "Below Player"          ,"Everything below the video's player"                 );
+        initToggle('ShowMerchStore'            ,'ytt-show-merch-store'           ,() => { showMerchStore        = !showMerchStore          ;toggleMerchStore()                                               ;}, "Merch Store"           ,"The Shop Section under videos"                       );
+        initToggle('ShowComments'              ,'ytt-show-comments'              ,() => { showComments          = !showComments            ;toggleComments()                                                 ;}, "Comments"              ,"The entire comment section"                          );
+         initToggle('ShowCommentingField'      ,'ytt-show-commenting-field'      ,() => { showCommentingField   = !showCommentingField     ;toggleCommentingField()                                          ;}, "Commenting Field"      ,"The place that you type and submit comments"         );
+         initToggle('showReplyButton'          ,'ytt-show-reply-button'          ,() => { showReplyButton       = !showReplyButton         ;toggleReplyButton()                                              ;}, "Reply Button"          ,"reply buttons in comments"                           );
+/*======================================================
+*        DEVELOPER TOGGLES
+*======================================================*/
+        //initToggle('DebugMode',                 'ytt-debug-mode',                 () => { debugMode             = !debugMode;                                                                                     }, "DebugMode"             ,"Console Logs more step by step function calling"             );
+        initToggle('EnableBetterZoom'          ,'ytt-enable-better-zoom'         ,() => { enableBetterZoom      = !enableBetterZoom        ;getURL_id()===0&&enableBetterZoom?homepageZoomOn():homepageZoomOff() ;}, "Better Zoon"           ,"Allows content to fill the screen better when zooming out"   );                                                                                                                               /*if (getURL_id() === 0 && enableBetterZoom) {homepageZoomOn();} else{homepageZoomOff();}*/
+        initToggle('EnableStreamerMode'        ,'ytt-enable-streamer-mode'       ,() => { enableStreamerMode    = !enableStreamerMode      ;toggleStreamerMode()                                                 ;}, "Streamer Mode"         ,"Tries Removing Identifying Information (*not perfect*)"      );
+        initToggle('ShowLabsFeature'           ,'ytt-show-labs-feature'          ,() => { showLabsFeature       = !showLabsFeature         ;toggleLabsFeature()                                                  ;}, "Labs Feature"          ,"Currently Does Nothing"                                      );
+        initToggle('LogMetadata'               ,'ytt-logging'                    ,() => { enableLogging         = !enableLogging           ;processVideos()                                                      ;}, "LogMetadata"           ,"Console Logs videos metadata loading in the DOM"             );
+        initToggle('enableExperimental'        ,'ytt-enable-experimental'        ,() => { enableExperimental    = !enableExperimental      ;toggleExperimental()                                                 ;}, "Experimental"          ,"Experimental toggles (read source code)"                     );
+            _inputField('enableExperimental'     ,'ytt-experimental-value', -1, "number", "ytt-experiemental-id");
     }
 
 
@@ -1542,7 +1812,7 @@ KNOWN BUGS:
         replicatedButton.querySelector('path').setAttribute('d', 'M21 5H3a1 1 0 000 2h18a1 1 0 100-2Zm-3 6H6a1 1 0 000 2h12a1 1 0 000-2Zm-3 6H9a1 1 0 000 2h6a1 1 0 000-2Z')
         replicatedButton.style.borderRadius = '100px';
         replicatedButton.style.marginLeft = '12px';
-        replicatedButton.style.backgroundColor = 'var(--yt-sys-color-baseline--additive-background)';//'var(--yt-spec-additive-background)';
+        replicatedButton.style.backgroundColor = 'var(--yt-sys-color-baseline--additive-background)';
 
         const menu = createMenu();
         checkPerformance1Arg(populateMenuContainer, menu);
