@@ -17,21 +17,11 @@
 
 
 /*
- *
- * for 1.1.5
-   *
-   *  additions: 
-   *    Streamed toggle - removes videos labled as "streamed x (hours, days, etc.) ago". This works long as the views entered is higher than the videos view count" 
-   *    getMetadata function - allows for easily grabbing video meta information.
-   *    String to Number Converter - Strings representing numbers with abbreviations like k, m, b, for thousand, million, billion, can now be converted more easily through a function.
-   *    
-   *  changes: 
-   *    members only toggle - now removes the 'Get more from memberships' shelf
-   *  
-   *  fixes: 
-   *    fixed a bug where the report button on comments did not show.
-   *    shorts should always be hidden when toggled off.
-   *
+ * for 1.1.6
+   *  Fixes: 
+   *    getMetadata function - Cleaned up the structure a bit more, and mirrored processVideo to be similar as well.
+   *    String to Number Converter - lowercase "k", "m", "b", are now uppercase "K", "M", "B", repectively 
+   *    fixed an issue where the name of a shelf would not be logged correctly
  * /
 
 
@@ -471,10 +461,13 @@ KNOWN BUGS:
                         break;
 
                         default:
-                            console.info(
-                                "query: ", query,
-                                "\ntitle checked: ", title
-                            );
+                            if (enableLogging && !query.dataset.logged) {
+                                console.info(
+                                    "query: ", query,
+                                    "\ntitle checked: ", text
+                                );
+                                query.dataset.logged = "true";
+                            }
                         break;
                     }
                 }
@@ -916,43 +909,40 @@ KNOWN BUGS:
         if (num.isInteger) { 
             return num;
         }
-        if (num.includes("k")) { 
+        if (num.includes("K")) { 
             return parseFloat(num) * 1e3;
         }
-        if (num.includes("m")) { 
+        if (num.includes("M")) { 
             return parseFloat(num) * 1e6;
         }
-        if (num.includes("b")) {
+        if (num.includes("B")) {
             return parseFloat(num) * 1e9;
         }
         return parseFloat(num);
     }
 
     function getMetadata(video) {
-        console.debug(video);
+        //console.debug(video);
         const url           = video.querySelector(".ytLockupMetadataViewModelTitle");
         const title         = video.querySelector(".ytLockupMetadataViewModelHeadingReset").title;
         const otherMetadata = video.querySelectorAll(".ytContentMetadataViewModelMetadataRow");
         const channel       = otherMetadata[0].textContent;
         let views;
         let date;
-        if (getURL_id() === 0) { 
-            views     = otherMetadata[1].children[0].textContent;
-            date      = otherMetadata[1].children[2].textContent;
+        switch (getURL_id()) { 
+            case 0: 
+                views = otherMetadata[1].children[0].textContent;
+                date  = otherMetadata[1].children[2].textContent;
+                break;
+            case 1:
+                views = otherMetadata[1].children[1].textContent;
+                date  = otherMetadata[1].children[3].textContent;
+                break;
         }
-        if (getURL_id() === 1) { 
-            views     = otherMetadata[1].children[1].textContent;
-            date      = otherMetadata[1].children[3].textContent;
-        }
-        const duration      = video.querySelector(".ytBadgeShapeText")?.textContent.trim();
-        let   progress      = video.querySelector(".ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment");
-        if (progress) {
-            progress = progress.style.width;
-        }
-        else {
-            progress = "0%";
-        }
-        return({url, title, name, views, date, duration, progress});
+        const duration = video.querySelector(".ytBadgeShapeText")?.textContent.trim();
+        let   progress = video.querySelector(".ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment");
+        progress = progress ? progress.style.width : "0%"
+        return({url, title, channel, views, date, duration, progress});
     }
 
     function startVideoChecks() {
@@ -969,17 +959,14 @@ KNOWN BUGS:
                         query.dataset.logged = "true";
                     }
                     let progressBlocked = false;
-                    //conditions are met, check if it needs to be blocked 
-                    if (parseFloat(video.progress) >= localStorage.getItem('ytt-max-watch-percent')) {
+                    if (parseFloat(video.progress) >= localStorage.getItem('ytt-max-watch-percent')) { //conditions are met, check if it needs to be blocked 
                         query.style.display = showWatched ? '' : 'none';
                         progressBlocked = true;
                     }
-                    //was Streamed, and has low views 
-                    if (video.date.includes("Streamed") && (convertStringToNumber(video.views) < localStorage.getItem('ytt-streamed-value'))) { 
+                    if (video.date.includes("Streamed") && (convertStringToNumber(video.views) < localStorage.getItem('ytt-streamed-value'))) { //was Streamed, and has low views 
                         query.style.display = showStreamed ? '' : 'none';
                     }
-                    //conditions not met, unblock it, unless it was already blocked by progress  
-                    else if (!progressBlocked) { 
+                    else if (!progressBlocked) { //conditions not met, unblock it, unless it was already blocked by progress  
                         query.style.display = '';
                     }
                 });
@@ -1040,35 +1027,71 @@ KNOWN BUGS:
                 if (item.querySelector(".ytLockupMetadataViewModelTitle").href.endsWith("radio=1")) { 
                     return; //ignoring music videos for now
                 }
+
+
                 let video = getMetadata(item);
-                console.info(video);
-
-                item.removeAttribute('is-in-first-column');
-                const progressSegment = item.querySelector('.ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment');
-                const watchedPercent = progressSegment ? parseFloat(progressSegment.style.width) || 0 : 0;
-                const max = localStorage.getItem('ytt-max-watch-percent');
-
-                if (watchedPercent >= max) { //if max was 50, it would hide videos watched 50% or more, but conversely it also unhides videos below the threshold, unhiding things hidden by other toggles
-                    item.style.display = showWatched ? '' : 'none';
+                if (enableLogging && !item.dataset.logged) {
+                    console.info(video);
+                    item.dataset.logged = "true";
                 }
-                else {
+                let progressBlocked = false;
+                if (parseFloat(video.progress) >= localStorage.getItem('ytt-max-watch-percent')) { //conditions are met, check if it needs to be blocked 
+                    item.style.display = showWatched ? '' : 'none';
+                    progressBlocked = true;
+                }
+                if (video.date.includes("Streamed") && (convertStringToNumber(video.views) < localStorage.getItem('ytt-streamed-value'))) { //was Streamed, and has low views 
+                    item.style.display = showStreamed ? '' : 'none';
+                }
+                else if (!progressBlocked) { //conditions not met, unblock it, unless it was already blocked by progress  
                     item.style.display = '';
                 }
 
-                if (enableLogging && !item.dataset.logged) {
-                    try {
-                        let metadata = item.querySelector('.ytLockupMetadataViewModelTextContainer');
-                        if (metadata) {
 
-                            console.info(metadata);
-                            item.dataset.logged = 'true';
-                            //printMetadata(metadata);
-                        }
-                    }
-                    catch (e) {
-                        console.warn('metadata could not be found: ', e);
-                    }
-                }
+
+
+
+
+
+
+
+
+
+
+
+//                let video = getMetadata(item);
+//                console.info(video);
+//
+//                item.removeAttribute('is-in-first-column');
+                
+                
+  
+
+                //const progressSegment = item.querySelector('.ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment');
+                //const watchedPercent = progressSegment ? parseFloat(progressSegment.style.width) || 0 : 0;
+                //const max = localStorage.getItem('ytt-max-watch-percent');
+//
+                //if (watchedPercent >= max) { //if max was 50, it would hide videos watched 50% or more, but conversely it also unhides videos below the threshold, unhiding things hidden by other toggles
+                //    item.style.display = showWatched ? '' : 'none';
+                //}
+                //else {
+                //    item.style.display = '';
+                //}
+
+//                if (enableLogging && !item.dataset.logged) {
+//                    try {
+//                        let metadata = item.querySelector('.ytLockupMetadataViewModelTextContainer');
+//                        
+//                        if (metadata) {
+//                            console.info(metadata);
+//                            item.dataset.logged = 'true';
+//                        }
+//
+//
+//                    }
+//                    catch (e) {
+//                        console.warn('metadata could not be found: ', e);
+//                    }
+//                }
             });
         }
     }
