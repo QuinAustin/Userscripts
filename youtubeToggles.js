@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Toggles
 // @namespace    Violentmonkey Scripts
-// @version      1.1.4
+// @version      1.1.5
 // @description  Allows hiding a variety of YouTube webpage elements
 // @author       -
 // @match        https://www.youtube.com/*
@@ -15,36 +15,33 @@
 
 
 
+
 /*
-1.1.4
-Additions:
-added 11 toggles & functions
-    -showCountryCode
-    -showEndButtons (this is further split to 3 individual toggles)
-        -showCreateButton
-        -showNotifications
-        -showPfp
-    -showSubscriptions
-    -showMerchStore
-    -showComments
-    -showCommentingField
-    -showReplyButton
-    -enableExperimental
-These used to be exclusive to the streamer mode toggle, but now they are all seperated into their own individual toggles. Enabling StreamerMode will override and hide the elements.
+ *
+ * for 1.1.5
+   *
+   *  additions: 
+   *    Streamed toggle - removes videos labled as "streamed x (hours, days, etc.) ago". This works long as the views entered is higher than the videos view count" 
+   *    getMetadata function - allows for easily grabbing video meta information.
+   *    String to Number Converter - Strings representing numbers with abbreviations like k, m, b, for thousand, million, billion, can now be converted more easily through a function.
+   *    
+   *  changes: 
+   *    members only toggle - now removes the 'Get more from memberships' shelf
+   *  
+   *  fixes: 
+   *    fixed a bug where the report button on comments did not show.
+   *    shorts should always be hidden when toggled off.
+   *
+ * /
 
-Can now hide children, without losing them.
 
-Fixed an issue where members only videos were not properly hidden on the watchpage's related content.
 
-experimental toggle for changing the number of videos/shorts per row. This is similar to the BetterZoom toggle, but no zoom required. 
-*/
+
 
 /*
 KNOWN BUGS:
 -When Guide is turned off, if the first video in a row is under the location where the Guide WOULD be, the video will not autoplay.
   *Temporary Solution: Turning the Guide back on, OR zoom out so the video is no longer under where the Guide's area would be.
-
--(unknown cause) shorts will sometimes not be hidden. This is seemingly unrelated to the URL, and refreshing fixes the issue.
 */
 
 
@@ -142,6 +139,7 @@ KNOWN BUGS:
     let showMemberOnly          = declareKey('ytt-show-member-only'           , true);
     let showSponsored           = declareKey('ytt-show-sponsored'             , true);
     let showLivestreams         = declareKey('ytt-show-livestreams'           , true);
+    let showStreamed     = declareKey('ytt-show-streamed'      , true);
 /*======================================================
 *        WATCH PAGE TOGGLES
 *======================================================*/
@@ -287,47 +285,12 @@ KNOWN BUGS:
        * compare channel name against list of blocked channel names
        * if channel name is blocked, hide video
        *
-       *
        * check blocked channel expiration time (the idea here would be that channels get blocked for around a week, that way it has time to cycle out, without having to think about removing them)
        *    this could potentially have further storage of a blocked counter, i.e this channel was blocked a second time, lets increase the expiration to 1 month. so 1st time = 1 week, 2nd time = 1 month, 3 times = one year (maybe less)
-       *
-       *
-       *
+
        * other idea, a dedicated one click button to send the "don't recommend channel" button
        */
-
-
-
-
-
-    /*
-      //looking for a button with an aria-label "Search using AI Mode"
-      const center = document.querySelector("#center");
-      const AISearchButton =  center.querySelector('[aria-label="Search using AI Mode"]');
-      const AISearchbox = center.querySelector("#i0");
-      const AISearchboxComponents = document.querySelector('.ytSearchboxComponentActions');
-
-      const AISearchText = document.querySelector('[placeholder="Search or ask a question"]');
-      const scrollContainer = document.querySelector('#scroll-container');
-
-      AISearchButton&&(AISearchButton.style.display=showLabsFeature?"":"none");
-      AISearchbox&&(AISearchbox.style.display=showLabsFeature?"":"none");
-      AISearchboxComponents&&(AISearchboxComponents.style.display=showLabsFeature?"":"none");
-
-
-      AISearchText&&(AISearchText.placeholder=showLabsFeature?"Search or ask a question":"Search");
-
-      if(scrollContainer) {
-          const AIChip = scrollContainer.querySelector('[chip-style="STYLE_AI_MODE_CHIP"]')
-          if (AIChip) {
-              AIChip.style.display = showLabsFeature ? "" : "none";
-          }
-      }
-    */
   }
-
-
-
 
 
 
@@ -357,16 +320,6 @@ KNOWN BUGS:
     function getZoomOut() {
         return ((100 - Math.round(window.devicePixelRatio * 100 ) ) / 10); //i.e. 100% returns 0, 90% returns 1, ..., 30% returns 7
     }
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -417,7 +370,13 @@ KNOWN BUGS:
                     query.style.display = enabled;
                 }
             })
-            toggleQuerySelector('ytd-menu-service-item-renderer', enabled); //gemini button in the video's 3 dot button's submenu [right of the share button] p.s. this gets unhidden every time the menu is reopened, so it needs a display change
+
+
+            //Not Needed Anymore - Initially commented as it was hiding the report button on comments. Upon further investigation the gemini button was no longer in the location, so it will be left commented.
+            //
+            //toggleQuerySelector('ytd-menu-service-item-renderer', enabled); //gemini button in the video's 3 dot button's submenu [right of the share button] p.s. this gets unhidden every time the menu is reopened, so it needs a display change
+
+
             toggleQuerySelector('#video-summary',enabled) //AI summary in video descriptions
             toggleQuerySelector('yt-video-description-youchat-section-view-model',enabled) //gemini button in video description (pulls up a chat window)
             toggleQuerySelector('.you-chat-entrypoint-button',enabled)                     //gemini button in the video player (pulls up a chat window)
@@ -507,6 +466,9 @@ KNOWN BUGS:
                         case 'free primetime movies':
                             query.style.display = showFreeMovies ? '' : 'none';
                         break;
+                        case 'get more from memberships':
+                            query.style.display = showMemberOnly ? '' : 'none';
+                        break;
 
                         default:
                             console.info(
@@ -527,24 +489,6 @@ KNOWN BUGS:
         }
     }
 
-  /*
-
-
-
-
-  */
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     function startItemChecks() {
@@ -561,16 +505,6 @@ KNOWN BUGS:
                     }
                 }
 
-
-                /* has not appeared in a long time, likely to be fully replaced with the new "Ask YouTube" search feature
-                    //AI Recommendation Chat Prompt   (not tested)
-                    if (query.querySelector('ytd-talk-to-recs-flow-renderer')) {
-                        query.style.display = showAI ? '' : 'none';
-                    }
-                */
-
-
-
                 //video recommendation prompt that takes over a video spot to say "new to you"
                 const title = query.querySelector('#title')?.textContent.trim().toLowerCase();
                 if (title === 'looking for something different?') {
@@ -581,6 +515,18 @@ KNOWN BUGS:
             });
         }
     }
+
+
+
+
+    function toggleMembersOnly() {
+        if (getURL_id() === 0) {
+            startShelfChecks(); //removes 'get more from memberships' shelf on the homepage
+        }
+        startItemChecks();  //removes 'members only' tagged videos
+    }
+
+
 
 
 
@@ -761,7 +707,7 @@ KNOWN BUGS:
 
 
                         //End
-              //          setElementProperty(end, 'margin-left', '20', '%');
+                            //setElementProperty(end, 'margin-left', '20', '%');
 
                     } catch(e) {
 
@@ -956,30 +902,89 @@ KNOWN BUGS:
 
 
 
+    function autoJumpAhead() {
+      const ja = document.querySelector('.ytwTimelyActionViewModelHost > button-view-model:nth-child(1) > button:nth-child(1)');
+      if (ja) { //if it is not showing on the player, this element does not exist
+        ja.click();
+      }
+    }
 
 
 
 
+    function convertStringToNumber(num) { 
+        if (num.isInteger) { 
+            return num;
+        }
+        if (num.includes("k")) { 
+            return parseFloat(num) * 1e3;
+        }
+        if (num.includes("m")) { 
+            return parseFloat(num) * 1e6;
+        }
+        if (num.includes("b")) {
+            return parseFloat(num) * 1e9;
+        }
+        return parseFloat(num);
+    }
+
+    function getMetadata(video) {
+        console.debug(video);
+        const url           = video.querySelector(".ytLockupMetadataViewModelTitle");
+        const title         = video.querySelector(".ytLockupMetadataViewModelHeadingReset").title;
+        const otherMetadata = video.querySelectorAll(".ytContentMetadataViewModelMetadataRow");
+        const channel       = otherMetadata[0].textContent;
+        let views;
+        let date;
+        if (getURL_id() === 0) { 
+            views     = otherMetadata[1].children[0].textContent;
+            date      = otherMetadata[1].children[2].textContent;
+        }
+        if (getURL_id() === 1) { 
+            views     = otherMetadata[1].children[1].textContent;
+            date      = otherMetadata[1].children[3].textContent;
+        }
+        const duration      = video.querySelector(".ytBadgeShapeText")?.textContent.trim();
+        let   progress      = video.querySelector(".ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment");
+        if (progress) {
+            progress = progress.style.width;
+        }
+        else {
+            progress = "0%";
+        }
+        return({url, title, name, views, date, duration, progress});
+    }
 
     function startVideoChecks() {
         //Videos: 'yt-lockup-view-model'
         //Shorts: 'ytd-reel-shelf-renderer'
         //Movies: 'ytd-compact-movie-renderer'
-
-
-
         const container = getContents();
         try {
             if (container) {
                 container.querySelectorAll('yt-lockup-view-model').forEach(query => {
-                    const progressSegment = query.querySelector('.ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment');
-                    let watchedPercent = progressSegment ? parseFloat(progressSegment.style.width) || 0 : 0;
-                    console.info("video: ",query, "watchedPercent: ", watchedPercent);
-                    let max = localStorage.getItem('ytt-max-watch-percent');
-                    if (watchedPercent >= max) {
+                    let video = getMetadata(query);
+                    if (enableLogging && !query.dataset.logged) {
+                        console.info(video);
+                        query.dataset.logged = "true";
+                    }
+                    let progressBlocked = false;
+                    //conditions are met, check if it needs to be blocked 
+                    if (parseFloat(video.progress) >= localStorage.getItem('ytt-max-watch-percent')) {
                         query.style.display = showWatched ? '' : 'none';
+                        progressBlocked = true;
+                    }
+                    //was Streamed, and has low views 
+                    if (video.date.includes("Streamed") && (convertStringToNumber(video.views) < localStorage.getItem('ytt-streamed-value'))) { 
+                        query.style.display = showStreamed ? '' : 'none';
+                    }
+                    //conditions not met, unblock it, unless it was already blocked by progress  
+                    else if (!progressBlocked) { 
+                        query.style.display = '';
                     }
                 });
+
+
 
                 //Check For Shelfs
                 document.querySelectorAll('ytd-reel-shelf-renderer').forEach(query => {
@@ -1022,38 +1027,23 @@ KNOWN BUGS:
     }
 
 
-    function autoJumpAhead() {
-      const ja = document.querySelector('.ytwTimelyActionViewModelHost > button-view-model:nth-child(1) > button:nth-child(1)');
-      if (ja) { //if it is not showing on the player, this element does not exist
-        ja.click();
-      }
-    }
-
-
-
-    function setVideoProgress(video) {
-      video.progress();
-    }
-
-
-
-    function printMetaData(metadata) {
-        console.info(metadata.children[0].title) //title of video
-        //metadata.children[1].querySelectorAll("span")[0].textContent //Channel Name
-        //metadata.children[1].querySelectorAll("span")[7].textContent //Views (rounded after 1k)
-        //metadata.children[1].querySelectorAll("span")[9].textContent //Upload Time (1s ago, m ago, h ago d ago, mo ago)
-    }
 
 
     function processVideos() {
-        //const url = getURL_id();
         const contents = getContents();
         if (contents) {
             const items = contents.querySelectorAll('ytd-rich-item-renderer');
             items.forEach(item => {
-                //if(item.hasAttribute('is-in-first-column')) { //when videos are removed, this will fix spacing issues
-                    item.removeAttribute('is-in-first-column');
-                //}
+                if (item.hasAttribute("is-shelf-item")) { 
+                    return; //ignoring shelf items for now like shorts (these also have no href associated, so it gets checked first)
+                }
+                if (item.querySelector(".ytLockupMetadataViewModelTitle").href.endsWith("radio=1")) { 
+                    return; //ignoring music videos for now
+                }
+                let video = getMetadata(item);
+                console.info(video);
+
+                item.removeAttribute('is-in-first-column');
                 const progressSegment = item.querySelector('.ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment');
                 const watchedPercent = progressSegment ? parseFloat(progressSegment.style.width) || 0 : 0;
                 const max = localStorage.getItem('ytt-max-watch-percent');
@@ -1065,7 +1055,6 @@ KNOWN BUGS:
                     item.style.display = '';
                 }
 
-
                 if (enableLogging && !item.dataset.logged) {
                     try {
                         let metadata = item.querySelector('.ytLockupMetadataViewModelTextContainer');
@@ -1073,33 +1062,8 @@ KNOWN BUGS:
 
                             console.info(metadata);
                             item.dataset.logged = 'true';
-                            printMetaData(metadata);
+                            //printMetadata(metadata);
                         }
-                        //else { //video either is not loaded in yet, or it is a short
-                        //  metadata = item.querySelectorAll('.shortsLockupViewModelHostOutsideMetadata');
-                        //  if (metadata.length !== 0) {
-                        //    console.info(metadata);
-                        //    item.dataset.logged = 'true';
-                        //  }
-                        //  else {
-                        //    console.info(item, " has no readable metadata: ", metadata);
-                        //  }
-                        //}
-
-
-
-
-
-                        //const title = item.querySelector('.yt-lockup-metadata-view-model-wiz__title span')?.textContent.trim();
-                        //const title       = item.querySelector('.yt-lockup-metadata-view-model__heading-reset')?.textContent.trim();
-                        //const channelName = item.querySelector('.yt-core-attributed-string__link')?.textContent.trim();
-                        //const channelURL  = item.querySelector('.yt-core-attributed-string__link')?.href;
-                        //const metadata    = item.querySelectorAll('.yt-content-metadata-view-model__metadata-row')[1]?.textContent.trim().split(' • ');
-                        //const views       = metadata[0];
-                        //const uploadDate  = metadata[1];
-                        //const duration    = item.querySelector('.ytBadgeShapeText')?.textContent.trim();
-//
-                        //console.info({title, channelName, channelURL, views, uploadDate, duration, watchedPercent});
                     }
                     catch (e) {
                         console.warn('metadata could not be found: ', e);
@@ -1307,7 +1271,7 @@ KNOWN BUGS:
     function resetItemsPerRow() {
         const container = document.querySelector('ytd-rich-grid-renderer');
         if (container) {
-            container.style.setProperty('--ytd-rich-grid-items-per-row', container.elementsPerRow); //elementsPerRow is a YouTube specific attribute 
+            container.style.setProperty('--ytd-rich-grid-items-per-row', container.elementsPerRow); //elementsPerRow is a YouTube specific attribute
             console.debug("elements per row: ", container.elementsPerRow)
             //container.style.setProperty('--ytd-rich-grid-items-per-row', '');
         }
@@ -1317,15 +1281,15 @@ KNOWN BUGS:
                 query.style.setProperty('--ytd-rich-grid-items-per-row', (6));
                 console.debug("property value: ", Math.round(container.style.getPropertyValue('--ytd-rich-grid-items-per-row')*1.5));
             });
-            
+
         }
     }
 
     function toggleExperimental() {
-        console.debug("experimental toggle flipped", enableExperimental);
+        //console.debug("experimental toggle flipped", enableExperimental);
         const value = localStorage.getItem('ytt-experimental-value');
-        console.debug("experimental value: ", value);
-        if (enableExperimental) { 
+        //console.debug("experimental value: ", value);
+        if (enableExperimental) {
             setItemsPerRow(value);
         }
         else {
@@ -1619,6 +1583,7 @@ KNOWN BUGS:
               createToggle('ShowMemberOnly'),
               createToggle('ShowSponsored'),
               createToggle('ShowLivestreams'),
+              createToggle('ShowStreamed'),
       /*======================================================
        *        WATCH PAGE TOGGLES
        *======================================================*/
@@ -1756,9 +1721,11 @@ KNOWN BUGS:
             inputField('ShowWatchedVideos'     ,'ytt-max-watch-percent');
         initToggle('ShowPurchasedVideos'       ,'ytt-show-purchased'             ,() => { showPurchased         = !showPurchased           ;startItemBadgeChecks()                                           ;}, "Purchased Videos"      ,"Turns on Purchased Videos"           );
         initToggle('ShowFreeMovies'            ,'ytt-show-free-movies'           ,() => { showFreeMovies        = !showFreeMovies          ;startItemBadgeChecks()                                           ;}, "Free Movies"           ,"Turns on Free & Primetime Movies"    );
-        initToggle('ShowMemberOnly'            ,'ytt-show-member-only'           ,() => { showMemberOnly        = !showMemberOnly          ;startItemBadgeChecks()                                           ;}, "Member Only"           ,"Turns on Members Only Videos"        );
+        initToggle('ShowMemberOnly'            ,'ytt-show-member-only'           ,() => { showMemberOnly        = !showMemberOnly          ;toggleMembersOnly()                                              ;}, "Member Only"           ,"Turns on Members Only Videos"        );
         initToggle('ShowSponsored'             ,'ytt-show-sponsored'             ,() => { showSponsored         = !showSponsored           ;startItemBadgeChecks()                                           ;}, "Sponsored"             ,"Turns on Sponsored Video Ads"        );
         initToggle('ShowLivestreams'           ,'ytt-show-livestreams'           ,() => { showLivestreams       = !showLivestreams         ;startItemBadgeChecks()                                           ;}, "Livestreams"           ,"Turns on Livestreams"                );
+        initToggle('ShowStreamed'              ,'ytt-show-streamed'              ,() => { showStreamed          = !showStreamed            ;startVideoChecks()                                               ;}, "Past Livestreams"      ,"Turns on Past Livestreams (streamed)");
+            _inputField('ShowStreamed'          ,'ytt-streamed-value', 1e12, "number", "ytt-streamed-id");
 /*======================================================
 *        WATCH PAGE TOGGLES
 *======================================================*/
@@ -1906,6 +1873,7 @@ KNOWN BUGS:
         try {
             const observer = new MutationObserver(() => {
                 let url = getURL_id();
+                toggleExperimental();
                 defaultCalls();
 
                 if (url === 0) {
