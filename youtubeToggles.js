@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Toggles
 // @namespace    Violentmonkey Scripts
-// @version      1.1.6
+// @version      1.1.7
 // @description  Allows hiding a variety of YouTube webpage elements
 // @author       -
 // @match        https://www.youtube.com/*
@@ -15,28 +15,18 @@
 
 
 
-
 /*
- * for 1.1.6
+ * for 1.1.7
    *  Summary:
-   *        Reduced File Size From 86.5 KB to less than 70 KB
+   *    collapsible menu 
    *  Fixes:
-   *        getMetadata function - Cleaned up the structure a bit more, and mirrored processVideo to be similar as well.
-   *        String to Number Converter - lowercase "k", "m", "b", are now uppercase "K", "M", "B", repectively
-   *        fixed an issue where the name of a shelf would not be logged correctly
-   *        some items are being logged differently, as they do not contain all metadata.
-   *        tooltips are finally a thing, no more long descriptions unless you /want/ a long description of how a toggle works (by hovering the text).
-   *
+   *    none
    *  Removals:
-   *        no longer using two different inputfields, inputfields are now smaller.
-   *
+   *    unused functions, or replaced functions that do a similar thing
+   *  Additions:
+   *    guide sidebar is now able to have more things removed
    *  Changes:
-   *        The old function for populating the menu is gone, and a new one was made to replace it.
-   *        The arrow functions were also replaced with regular functions to help with readability.
-   *        Toggles can now have a toggleChild, this helps to visually see the parentToggle will override other toggles.
-   *        
- * /        
-
+ * /    child buttons are now collapsible when clicking on the parent button's text
 
 
 /*
@@ -46,6 +36,8 @@ Known Issues:
 
 -GetMetadata() function is not able to parse every type of media yet. This means some toggles might not always work.
 */
+
+
 
 
 (function() {
@@ -118,30 +110,40 @@ Known Issues:
 /*======================================================
 *        HOME PAGE TOGGLES
 *======================================================*/
-    let showPrimaryHeader       = declareKey("ytt-show-primary-header"        , true);
-    let showGuide               = declareKey('ytt-show-guide'                 , true);
-        let showSubscriptions       = declareKey('ytt-show-subscriptions'         , true);
+    let showPrimaryHeader       = declareKey('ytt-show-primary-header'            , true);
+    let showGuide               = declareKey('ytt-show-guide'                     , true);
+        let showShortsButton         = declareKey('ytt-show-shorts-button'        , true);
+        let showSubscriptionsSection = declareKey('ytt-show-subscriptions-section', true);
+        let showYouSection           = declareKey('ytt-show-you-section'          , true);
+        let showExploreSection       = declareKey('ytt-show-explore-section'      , true);
+        let showFromYouTubeSection   = declareKey('ytt-show-from-youtube-section' , true);
+        let showReportHistoryButton  = declareKey('ytt-show-report-history-button', true);
+        let showFooterSection        = declareKey('ytt-show-Footer-Section'       , true);
+
+
+
+
 
 //Blocks of Content
-    let showBanner              = declareKey('ytt-show-banners'               , true);
-    let showShorts              = declareKey('ytt-show-shorts'                , true);
-    let showGames               = declareKey('ytt-show-games'                 , true);
-    let showBreakingNews        = declareKey('ytt-breaking-news'              , true);
-    let showPosts               = declareKey('ytt-show-posts'                 , true);
-    let showExploreMoreTopics   = declareKey('ytt-show-explore-more-topics'   , true);
-    let showWhatDidYouThink     = declareKey('ytt-what-did-you-think'         , true);
+    let showBanner              = declareKey('ytt-show-banners'             , true);
+    let showShorts              = declareKey('ytt-show-shorts'              , true);
+    let showGames               = declareKey('ytt-show-games'               , true);
+    let showBreakingNews        = declareKey('ytt-breaking-news'            , true);
+    let showPosts               = declareKey('ytt-show-posts'               , true);
+    let showExploreMoreTopics   = declareKey('ytt-show-explore-more-topics' , true);
+    let showWhatDidYouThink     = declareKey('ytt-what-did-you-think'       , true);
 
 //Types of Videos
-    let showMusic               = declareKey('ytt-show-music'                 , true);
-    let showPlaylists           = declareKey('ytt-show-playlists'             , true);
-    let showNewToYou            = declareKey('ytt-show-new-to-you'            , true);
-    let showWatched             = declareKey('ytt-show-watched'               , true);
-    let showPurchased           = declareKey('ytt-show-purchased'             , true);
-    let showFreeMovies          = declareKey('ytt-show-free-movies'           , true);
-    let showMemberOnly          = declareKey('ytt-show-member-only'           , true);
-    let showSponsored           = declareKey('ytt-show-sponsored'             , true);
-    let showLivestreams         = declareKey('ytt-show-livestreams'           , true);
-    let showStreamed            = declareKey('ytt-show-streamed'              , true);
+    let showMusic               = declareKey('ytt-show-music'       , true);
+    let showPlaylists           = declareKey('ytt-show-playlists'   , true);
+    let showNewToYou            = declareKey('ytt-show-new-to-you'  , true);
+    let showWatched             = declareKey('ytt-show-watched'     , true);
+    let showPurchased           = declareKey('ytt-show-purchased'   , true);
+    let showFreeMovies          = declareKey('ytt-show-free-movies' , true);
+    let showMemberOnly          = declareKey('ytt-show-member-only' , true);
+    let showSponsored           = declareKey('ytt-show-sponsored'   , true);
+    let showLivestreams         = declareKey('ytt-show-livestreams' , true);
+    let showStreamed            = declareKey('ytt-show-streamed'    , true);
 /*======================================================
 *        WATCH PAGE TOGGLES
 *======================================================*/
@@ -387,10 +389,9 @@ Known Issues:
         if (url === 0) { //Check that the user is on the Homepage
             //toggleBanner();
             togglePrimaryHeader();
-            toggleGuide();
+            checkGuideSection();
             toggleAI();
         }
-
         else if(url === 1) { //Check that the user is on a Watchpage
             toggleBelow();
             toggleRecommendations();
@@ -401,21 +402,21 @@ Known Issues:
     }
 
 
-    function togglePrimaryHeader() {
-        const primaryHeader = document.querySelector('ytd-feed-filter-chip-bar-renderer');
-        if (primaryHeader) {
-            primaryHeader.parentElement.style.display = showPrimaryHeader ? '' : 'none';
-            document.querySelector('#frosted-glass').style.height = showPrimaryHeader ? '112px' : '80px';
-        }
-    }
-
-    function toggleGuide() {
-        const guide = document.querySelector('#guide');
-        if (guide) {
-          guide.style.display = showGuide ? '' : 'none';
-          setElementProperty(document.querySelector('#content'), '--ytd-persistent-guide-width', showGuide ? '240' : '0', 'px');
-        }
-    }
+    //function togglePrimaryHeader() {
+    //    const primaryHeader = document.querySelector('ytd-feed-filter-chip-bar-renderer');
+    //    if (primaryHeader) {
+    //        primaryHeader.parentElement.style.display = showPrimaryHeader ? '' : 'none';
+    //        document.querySelector('#frosted-glass').style.height = showPrimaryHeader ? '112px' : '80px';
+    //    }
+    //}
+//
+    //function toggleGuide() {
+    //    const guide = document.querySelector('#guide');
+    //    if (guide) {
+    //      guide.style.display = showGuide ? '' : 'none';
+    //      setElementProperty(document.querySelector('#content'), '--ytd-persistent-guide-width', showGuide ? '240' : '0', 'px');
+    //    }
+    //}
 
 
     function toggleBanner() {
@@ -848,11 +849,56 @@ Known Issues:
       }
 
     }
-    function toggleSubscriptions() {
-      if (!enableStreamerMode) {
-          document.querySelector('ytd-guide-section-renderer:nth-child(2)').hidden = !showSubscriptions;
-      }
+
+
+    function toggleShortsButton() {
+        document.querySelectorAll('ytd-guide-section-renderer')[0].children[1].children[1].hidden = !showShortsButton;
     }
+    function toggleSubscriptionsSection() {
+        if (!enableStreamerMode) {
+            document.querySelectorAll('ytd-guide-section-renderer')[1].hidden = !showSubscriptionsSection;
+        }
+    }
+    function toggleYouSection() {
+
+        document.querySelectorAll('ytd-guide-section-renderer')[2].hidden = !showYouSection;
+    }
+    function toggleExploreSection() {
+        document.querySelectorAll('ytd-guide-section-renderer')[3].hidden = !showExploreSection;
+    }
+    function toggleFromYouTubeSection() {
+        document.querySelectorAll('ytd-guide-section-renderer')[4].hidden = !showFromYouTubeSection;
+    }
+    function toggleReportHistoryButton() {
+        document.querySelectorAll('ytd-guide-section-renderer')[5].hidden = !showReportHistoryButton;
+    }
+    function toggleFooterSection() {
+        document.querySelector('ytd-guide-renderer #footer').hidden = !showFooterSection;
+    }
+
+
+
+
+
+
+    function checkGuideSection() {
+        toggleGuide();
+        toggleShortsButton();
+        toggleSubscriptionsSection();
+        toggleYouSection();
+        toggleExploreSection();
+        toggleFromYouTubeSection();
+        toggleReportHistoryButton();
+        toggleFooterSection();
+    }
+
+
+
+
+
+
+
+
 
 
 
@@ -1145,7 +1191,9 @@ Known Issues:
         const toggleButton = toggle.querySelector('tp-yt-paper-toggle-button');
         toggleButton.checked = localStorage.getItem(key) === "true";
 
-        toggleButton.addEventListener('change', () => {
+        toggleButton.addEventListener('change', (e) => {
+            //e.stopPropagation();
+            //e.preventDefault();
             localStorage.setItem(key, toggleButton.checked);
             onChange();
         });
@@ -1191,7 +1239,28 @@ Known Issues:
         menu.append(childButton);
 
         let parentButton = document.querySelector(parentToggleName);
-        parentButton.appendChild(childButton);
+
+        if (parentButton.childElementCount == 1) { //Creates a container for child toggles to be stored
+            let parentText = parentButton.querySelectorAll('yt-formatted-string')[0].textContent
+
+
+            let childSection = document.createElement("ytt-"+parentToggleName+"-child-section")
+            parentButton.appendChild(childSection);
+            parentButton.querySelectorAll('#title')[0].textContent = '▼ '+parentText;
+            childSection.hidden = 'true';
+
+            parentButton.querySelector('yt-formatted-string').addEventListener('click', (e) => {
+                console.debug(e.target, e.currentTarget);
+                if( e.target !== e.currentTarget ) {
+                    return;
+                }
+                childSection.hidden = !childSection.hidden;
+                let direction = childSection.hidden ?  '▼ ' : '▲ ' ;//' ˅' : ' ˄';
+                parentButton.querySelectorAll('#title')[0].textContent = direction+parentText;
+
+            });
+        }
+        parentButton.childNodes[1].appendChild(childButton);
 
         createInitialzedToggleButton(toggleName, key, onChange, text, tooltip);
     }
@@ -1240,6 +1309,7 @@ Known Issues:
         /*======================================================
         *        GLOBAL TOGGLES
         *======================================================*/
+
         addToggleLabel(menuContainer, "Global Toggles", "15px");
         addToggleLabel(menuContainer, "Core UI", '10px');
              addToggle(menuContainer,                           'showCountryCode',    'ytt-show-country-code',  () => { showCountryCode   = !showCountryCode;   toggleCountryCode();        }, "Country Code",        "top right of YouTube Logo");
@@ -1252,10 +1322,17 @@ Known Issues:
         *        HOME PAGE TOGGLES
         *======================================================*/
         addToggleLabel(menuContainer, "Homepage Toggles", '15px');
-             addToggle(menuContainer,                      'showPrimaryHeader', 'ytt-show-primary-header', () => { showPrimaryHeader = !showPrimaryHeader; togglePrimaryHeader(); }, "Primary Header", "Tag header above homepage recommendations");
-             addToggle(menuContainer,                      'showGuide',         'ytt-show-guide',          () => { showGuide         = !showGuide        ; toggleGuide();         }, "Guide",          "The left side (Subscriptions, You, Explore, etc.)");
-                addToggleChild('showGuide', menuContainer, 'showSubscriptions', 'ytt-show-subscriptions',  () => { showSubscriptions = !showSubscriptions; toggleSubscriptions(); }, "Subscriptions",  "Homepage subscriptions on the left guide");
-                
+             addToggle(menuContainer,                      'showPrimaryHeader',       'ytt-show-primary-header',        () => { showPrimaryHeader        = !showPrimaryHeader;        togglePrimaryHeader();        }, "Primary Header",    "Tag header above homepage recommendations");
+             addToggle(menuContainer,                      'showGuide',               'ytt-show-guide',                 () => { showGuide                = !showGuide;                toggleGuide();                }, "Guide",             "The left side (Subscriptions, You, Explore, etc.)");
+                addToggleChild('showGuide', menuContainer, 'showShortsButton',        'ytt-show-shorts-button',         () => { showShortsButton         = !showShortsButton;         toggleShortsButton();         }, "Shorts Button",     "Button in Guide");
+                addToggleChild('showGuide', menuContainer, 'showSubscriptions',       'ytt-show-subscriptions-section', () => { showSubscriptionsSection = !showSubscriptionsSection; toggleSubscriptionsSection(); }, "Subscriptions",     "Section in Guide");
+                addToggleChild('showGuide', menuContainer, 'showYouSection',          'ytt-show-you-section',           () => { showYouSection           = !showYouSection;           toggleYouSection();           }, "You",               "Section in Guide");
+                addToggleChild('showGuide', menuContainer, 'showExplore',             'ytt-show-explore-section',       () => { showExploreSection       = !showExploreSection;       toggleExploreSection();       }, "Explore",           "Section in Guide");
+                addToggleChild('showGuide', menuContainer, 'showFromeYouTubeSection', 'ytt-show-from-youtube-section',  () => { showFromYouTubeSection   = !showFromYouTubeSection;   toggleFromYouTubeSection();   }, "More From YouTube", "Section In Guide");
+                addToggleChild('showGuide', menuContainer, 'showReportHistory',       'ytt-show-report-history-button', () => { showReportHistoryButton  = !showReportHistoryButton;  toggleReportHistoryButton();  }, "Report History",    "Button In Guide");
+                addToggleChild('showGuide', menuContainer, 'showFooterSection',       'ytt-show-Footer-Section',        () => { showFooterSection        = !showFooterSection;        toggleFooterSection();        }, "Footer",            "Section In Guide");
+
+
         addToggleLabel(menuContainer, "Blocks of Content", '10px');
              addToggle(menuContainer, 'showBanners',           'ytt-show-banners',              () => { showBanner            = !showBanner            ;startShelfChecks(); }, "Banners",             "Turns on Banners");
              addToggle(menuContainer, 'showShorts',            'ytt-show-shorts',               () => { showShorts            = !showShorts            ;startShelfChecks(); }, "Shorts",              "Homepage Shorts");
