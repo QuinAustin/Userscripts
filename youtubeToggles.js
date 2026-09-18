@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Toggles
 // @namespace    Violentmonkey Scripts
-// @version      1.1.5
+// @version      1.1.6
 // @description  Allows hiding a variety of YouTube webpage elements
 // @author       -
 // @match        https://www.youtube.com/*
@@ -18,26 +18,38 @@
 
 /*
  * for 1.1.6
-   *  Fixes: 
-   *    getMetadata function - Cleaned up the structure a bit more, and mirrored processVideo to be similar as well.
-   *    String to Number Converter - lowercase "k", "m", "b", are now uppercase "K", "M", "B", repectively 
-   *    fixed an issue where the name of a shelf would not be logged correctly
- * /
-
-
+   *  Summary:
+   *        Reduced File Size From 86.5 KB to less than 70 KB
+   *  Fixes:
+   *        getMetadata function - Cleaned up the structure a bit more, and mirrored processVideo to be similar as well.
+   *        String to Number Converter - lowercase "k", "m", "b", are now uppercase "K", "M", "B", repectively
+   *        fixed an issue where the name of a shelf would not be logged correctly
+   *        some items are being logged differently, as they do not contain all metadata.
+   *        tooltips are finally a thing, no more long descriptions unless you /want/ a long description of how a toggle works (by hovering the text).
+   *
+   *  Removals:
+   *        no longer using two different inputfields, inputfields are now smaller.
+   *
+   *  Changes:
+   *        The old function for populating the menu is gone, and a new one was made to replace it.
+   *        The arrow functions were also replaced with regular functions to help with readability.
+   *        Toggles can now have a toggleChild, this helps to visually see the parentToggle will override other toggles.
+   *        
+ * /        
 
 
 
 /*
-KNOWN BUGS:
+Known Issues:
 -When Guide is turned off, if the first video in a row is under the location where the Guide WOULD be, the video will not autoplay.
   *Temporary Solution: Turning the Guide back on, OR zoom out so the video is no longer under where the Guide's area would be.
+
+-GetMetadata() function is not able to parse every type of media yet. This means some toggles might not always work.
 */
 
 
 (function() {
     'use strict';
-
     //function checkPerformance(fun) {
     //    const startTime = performance.now()
     //    fun();
@@ -85,10 +97,10 @@ KNOWN BUGS:
 
 /*
  *  Guide for making a new toggle:
- *  1. add a variable
- *  2. add a createToggle()
- *  3. add a initToggle()
- *  4. make sure init toggle is calling the appropriate function for the new toggle
+ *  1. add a variable in the section below this guide
+ *  2. go to the function 'BuildMenuContainer(menuContainer)'
+    3. find the appropriate place in the menu, and add a new toggle with all the parameters filled in
+    4.
  */
 
   //This is for example purposes
@@ -129,7 +141,7 @@ KNOWN BUGS:
     let showMemberOnly          = declareKey('ytt-show-member-only'           , true);
     let showSponsored           = declareKey('ytt-show-sponsored'             , true);
     let showLivestreams         = declareKey('ytt-show-livestreams'           , true);
-    let showStreamed     = declareKey('ytt-show-streamed'      , true);
+    let showStreamed            = declareKey('ytt-show-streamed'              , true);
 /*======================================================
 *        WATCH PAGE TOGGLES
 *======================================================*/
@@ -312,9 +324,6 @@ KNOWN BUGS:
     }
 
 
-
-
-
     function togglePrimaryHeader(){const e=document.querySelector("ytd-feed-filter-chip-bar-renderer");e&&(e.parentElement.style.display=showPrimaryHeader?"":"none",document.querySelector("#frosted-glass").style.height=showPrimaryHeader?"112px":"80px")}
     function toggleGuide(){const e=document.querySelector("#guide");e&&(e.style.display=showGuide?"":"none",setElementProperty(document.querySelector("#content"),"--ytd-persistent-guide-width",showGuide?"240":"0","px"))}
 
@@ -347,7 +356,6 @@ KNOWN BUGS:
 
 
     function toggleAI() {
-
         if (getURL_id() === 0) {
             toggleAskYouTube();
         }
@@ -462,10 +470,10 @@ KNOWN BUGS:
 
                         default:
                             if (enableLogging && !query.dataset.logged) {
-                                console.info(
-                                    "query: ", query,
-                                    "\ntitle checked: ", text
-                                );
+                                console.info({
+                                    query,
+                                    text
+                                });
                                 query.dataset.logged = "true";
                             }
                         break;
@@ -473,7 +481,6 @@ KNOWN BUGS:
                 }
                 checkTitle(title)
                 checkTitle(title2)
-
                 });
             }
         } //try
@@ -488,28 +495,21 @@ KNOWN BUGS:
         const container = getContents();
         if (container) {
             container.querySelectorAll('ytd-rich-item-renderer').forEach(query => {
-
                 //Playlist, Podcast, Etc. Item
                 const playlistBadge = query.querySelector('.ytBadgeShapeText')?.textContent.trim().toLowerCase();
-
                 if (playlistBadge) {
                     if ( playlistBadge.includes('episodes') || playlistBadge.includes('lessons') || playlistBadge.includes('videos') ) {
                         query.style.display = showPlaylists ? '' : 'none';
                     }
                 }
-
                 //video recommendation prompt that takes over a video spot to say "new to you"
                 const title = query.querySelector('#title')?.textContent.trim().toLowerCase();
                 if (title === 'looking for something different?') {
                     query.style.display = showNewToYou ? '' : 'none';
                 }
-
-
             });
         }
     }
-
-
 
 
     function toggleMembersOnly() {
@@ -517,380 +517,6 @@ KNOWN BUGS:
             startShelfChecks(); //removes 'get more from memberships' shelf on the homepage
         }
         startItemChecks();  //removes 'members only' tagged videos
-    }
-
-
-
-
-
-    function BetterZoomWatchPageChanges() {
-        try {
-            let zoom = Math.round(window.devicePixelRatio * 100);
-            let trueDifference = ((100 - zoom)/10);
-            let difference = ((100 - zoom)/10)*3;
-
-
-                if (difference >= 0) {
-                    let changeValue = 0;
-
-
-                    try {
-                    /*
-                    MAIN DOCUMENT CHANGES
-                    */
-                        //main document font size
-
-                        document.documentElement.style.fontSize = (10 + difference) + "px";             //document.documentElement.style.fontSize = (10) + "px";
-
-                        //removes empty side borders
-                        const columns = document.querySelector('#columns');
-                        const secondary = columns.querySelector('#secondary');
-
-                        //Resize the divide between primary and secondary columns
-                        setElementProperty(columns, '--ytd-watch-flexy-sidebar-width', 100, "%");                   //setElementProperty(columns, '--ytd-watch-flexy-sidebar-width', 402, "px");
-                        setElementProperty(secondary, '--ytd-watch-flexy-sidebar-width', 30, "%");                  //setElementProperty(secondary, '--ytd-watch-flexy-sidebar-width', 402, "px");
-                        setElementProperty(secondary, '--ytd-watch-flexy-horizontal-page-margin', 32, "px");        //setElementProperty(secondary, '--ytd-watch-flexy-horizontal-page-margin', 16, "px");
-                    } catch(e) {
-                        console.log("(startVideoChecks) exception: Failed To Make Changes To Document");
-                    }
-
-                    try {
-                        /*
-                        RIBBON CHANGES
-                        */
-
-                        //toolbar size
-                        document.getElementById('masthead').style.setProperty('height', (200) + '%');           //document.getElementById('masthead').style.setProperty('height', (100) + '%');
-
-
-                        //toolbar logo size
-
-                            let mainSvgs = document.querySelectorAll('svg'); //'svg' //'ytd-button-renderer'
-                            changeValue = (100+difference*10);
-                            for (let i = 6; i <= 12; i++) {
-                                setElementProperty(mainSvgs[i], 'height', changeValue, "%");
-                                setElementProperty(mainSvgs[i], 'width',  changeValue, "%");
-                            }
-
-
-
-
-                        //fixing logos background bubble
-
-
-                        const container = document.getElementById('voice-search-button').parentNode.parentElement;
-                            const containerCN = container.childNodes;
-                                const start  = containerCN[1];
-                                const center = containerCN[3];
-                                const end    = containerCN[5];
-
-
-
-                        //Container
-                            const background  = document.getElementById('background');
-                            changeValue = (2 + (trueDifference/20)); //default is around 2.35%
-                            setElementProperty(background, 'height', ( 100 + trueDifference*30 ), '%');
-
-
-                            const pageManager = document.getElementById('page-manager');
-
-                            //setElementProperty(pageManager, 'margin-top', 'var(--ytd-masthead-height,var(--ytd-toolbar-height))', '');
-                            if (pageManager.querySelector('ytd-watch-flexy').fullscreenValue) {
-                                setElementProperty(pageManager, 'margin-top', '0', '%');
-                            }
-                            else{
-
-                                switch(trueDifference) {
-                                    case(0): //100
-                                        setElementProperty(pageManager, 'margin-top', 'var(--ytd-masthead-height,var(--ytd-toolbar-height))', '');
-                                        break;
-                                    case(1): //90
-                                        setElementProperty(pageManager, 'margin-top', '2.3%', '');
-                                        break;
-                                    case(2): //80
-                                        setElementProperty(pageManager, 'margin-top', '2.6%', '');
-                                        break;
-                                    case(3): //70
-                                        setElementProperty(pageManager, 'margin-top', '2.8%', '');
-                                        break;
-                                    case(4): //60
-                                        setElementProperty(pageManager, 'margin-top', '2.8%', '');
-                                        break;
-                                    case(5): //50
-                                        setElementProperty(pageManager, 'margin-top', '2.7%', '');
-                                        break;
-                                    case(6): //40
-                                        setElementProperty(pageManager, 'margin-top', '2.4%', '');
-                                        break;
-                                    case(7): //30
-                                        setElementProperty(pageManager, 'margin-top', '2%', '');
-                                        break;
-                                }
-                            }
-
-
-
-
-
-
-
-                        //Start
-          //                  setElementProperty(start, 'margin-right', '20', '%');
-                            const startCN = start.childNodes;
-                                const guideButton = startCN[5];
-                                const logoIcon    = startCN[8].querySelector('#logo-icon');
-
-                            setElementProperty(guideButton, 'padding-right', (15 + trueDifference*5), '%');
-                            setElementProperty(logoIcon, 'padding-left', (15 + trueDifference*5), '%');
-
-
-
-
-
-                        //Center
-                            setElementProperty(center, 'margin', '10', '%');
-                            //setElementProperty(center, 'margin-left', '10', '%');
-                            //setElementProperty(center, 'margin-right', '10', '%');
-
-                            const centerCN = center.childNodes;
-                            const searchBox         = centerCN[1];
-                            const searchButtton     = centerCN[3];
-                            const voiceSearchButton = centerCN[5];
-                            const aiCompanionButton = centerCN[7];
-                            const YTTMenuButton     = centerCN[9];
-
-                            changeValue = 3 + trueDifference;
-                            setElementProperty(center, 'height', changeValue, '%');
-                            setElementProperty(center, 'width', changeValue, '%');
-                            setElementProperty(center, 'display', 'contents','');
-
-
-
-
-                            //setElementProperty(searchBox, 'margin-top', '10', 'px');
-                            //setElementProperty(searchBox, 'width', 'fit-content', '');
-                            //setElementProperty(searchBox, 'display', 'inline-flex', '');
-
-                            switch(trueDifference) {
-                                case(1):
-                                    //setElementProperty(searchBox, 'margin-top', '10', 'px');
-                                    setElementProperty(searchBox, 'height', (100), '%');
-                                    break;
-                                case(2):
-                                    //setElementProperty(searchBox, 'margin-top', '20', 'px');
-                                    setElementProperty(searchBox, 'height', (120), '%');
-                                    break;
-                                case(3):
-                                    //setElementProperty(searchBox, 'margin-top', '30', 'px');
-                                    setElementProperty(searchBox, 'height', (140), '%');
-                                    break;
-                            }
-
-                            if (difference === 0) {
-                                changeValue = 5.5;
-                            }
-                            else {
-                                changeValue = 5.5 + difference;
-                            }
-
-                            //setElementProperty(voiceSearchButton, 'height', changeValue, "%");
-                            //setElementProperty(voiceSearchButton, 'width', changeValue, "%");
-
-
-
-
-                        //End
-                            //setElementProperty(end, 'margin-left', '20', '%');
-
-                    } catch(e) {
-
-                          console.warn("(startVideoChecks) exception: Failed To Make Changes To Ribbon: ", e);
-
-                    }
-
-                    try {
-                    /*
-                    MAIN VIDEO PLAYER
-                    */
-                        //progress bar size
-                        document.querySelector('.ytp-progress-bar-container').style.setProperty('height', ( ( 6 + difference ) + 'px' ));
-
-                    } catch(e) {
-
-                            console.warn("(startVideoChecks) exception: Failed To Make Changes To Main Video Progress Bar");
-
-                    }
-
-                    try {
-                    /*
-                    COMMENT SECTION
-                    */
-                        //comment font size
-                        changeValue = (14+difference);
-                        document.querySelectorAll('.yt-spec-button-shape-next--size-m').forEach(query => {
-                            query.style.setProperty('font-size', ( (changeValue) + "px" ));
-                        });
-
-                        const comments = document.querySelector('ytd-comment-thread-renderer').parentElement;
-
-                        //comment author pngs size
-                        changeValue = (40+difference);
-                        comments.querySelectorAll('yt-img-shadow').forEach(query => {
-                            query.style.setProperty('width',  ( ( changeValue ) + "px" ));
-                            query.style.setProperty('height', ( ( changeValue ) + "px" ));
-                        });
-
-                        //comment emoji size
-                        changeValue = (14+difference);
-                        comments.querySelectorAll('#main img').forEach(query => {
-                            query.style.setProperty('width', (  ( changeValue ) + "px" ));
-                            query.style.setProperty('height', ( ( changeValue ) + "px" ));
-                        });
-
-                        //fix for the reply thread offset (caused by the script's scaling)
-                        changeValue = (36 + difference + 2);
-                        document.querySelectorAll('yt-sub-thread').forEach(query => {
-                            query.childNodes[0].style.setProperty('width', ( ( changeValue ) + "px" ));
-                        })
-                    }
-                    catch (e) {
-                        //Comments Usually Throw Excpeitons Because They Are Not Loaded Yet (Scroll Down To See Them, And The Exception Should Go Away)
-                            console.warn("(startVideoChecks) exception: Failed To Make Changes To Comments");
-
-                    }
-
-                    try {
-                    /*
-                    SIDE PANEL VIDEO RECOMMENDATIONS
-                    */
-                        //video recommendation thumbnail size
-                        changeValue = (168 + (difference*10 ))
-                        document.querySelectorAll('.yt-lockup-view-model__content-image').forEach(query => {
-                            query.style.setProperty('width', ( ( changeValue ) + "px" ));
-                        });
-
-                        //stops shorts from being spread out and weird looking
-                        try {
-                            columns.querySelector('ytd-reel-shelf-renderer').style.setProperty('--ytd-reel-item-compact-layout-width', 'initial');
-                        } catch(e) {
-                            //This Regularly Happens, Because Shorts Are Not Always Recommended
-                                console.warn("(startVideoChecks [Video Recommendation Side Panel]: exception: Failed To Make Chnages To Shorts");
-
-                        }
-                    } catch(e) {
-                         //Exception From Missing Shorts Section Gets Caught Here
-                            console.warn("(startVideoChecks): exception: Failed To Make Changes To Video Recommendation Side Panel");
-
-                    }
-
-                }
-                else if (difference >= 0) {
-                    const background  = document.getElementById('background');
-                    changeValue = (2 + (trueDifference/20)); //default is around 2.35%
-                    setElementProperty(background, 'height', ( 100 + trueDifference*30 ), '%');
-                }
-            }
-        catch(e){
-
-                console.warn("(startVideoChecks) exception: Failed To Make Changes To Watch Page", e);
-
-        }
-    }
-
-
-    function BetterZoomWatchPageReset() {
-        try {
-        /*
-        RESET MAIN DOCUMENT CHANGES
-        */
-            //Reset main document font size
-            document.documentElement.style.fontSize = (10) + "px";
-
-            //Reset to empty side borders
-            const columns = document.querySelector('#columns');
-            const secondary = columns.querySelector('#secondary');
-
-            //Reset the divide between primary and secondary columns
-            setElementProperty(columns, '--ytd-watch-flexy-sidebar-width', 402, "px");
-            setElementProperty(secondary, '--ytd-watch-flexy-sidebar-width', 402, "px");
-            setElementProperty(secondary, '--ytd-watch-flexy-horizontal-page-margin', 16, "px");
-        } catch(e) {
-            console.warn("(startVideoChecks) exception: Failed To Make Changes To Document");
-        }
-
-
-
-        try {
-            /*
-            RESET RIBBON CHANGES
-            */
-
-            //Reset toolbar size
-            document.getElementById('masthead').style.setProperty('height', (100) + '%');
-
-
-            //Reset toolbar logo size
-            let mainSvgs = document.querySelectorAll('svg'); //'svg' //'ytd-button-renderer'
-            for (let i = 6; i <= 12; i++) {
-                setElementProperty(mainSvgs[i], 'height', 100, "%");
-                setElementProperty(mainSvgs[i], 'width',  100, "%");
-            }
-
-
-            //Reset fixing logos background bubble
-            const container = document.getElementById('voice-search-button').parentNode.parentElement;
-              const containerCN = container.childNodes;
-                const start  = containerCN[1];
-                const center = containerCN[3];
-                const end    = containerCN[5];
-
-
-
-            //Reset Container
-            const background  = document.getElementById('background');
-            setElementProperty(background, 'height', (56), 'px');
-
-            const pageManager = document.getElementById('page-manager');
-            setElementProperty(pageManager, 'margin-top', 'var(--ytd-masthead-height,var(--ytd-toolbar-height))', '');
-
-
-            //Reset Start
-            setElementProperty(start, 'margin-right', '', '');
-            const startCN = start.childNodes;
-                const guideButton = startCN[5];
-                const logoIcon    = startCN[8].querySelector('#logo-icon');
-
-            //setElementProperty(guideButton, 'padding-right', (8), 'px');
-            setElementProperty(guideButton, 'padding-right', '', '');
-            setElementProperty(logoIcon,    'padding-left',  '', '');
-
-
-            //Center
-            setElementProperty(center, 'margin', '', '');
-            //setElementProperty(center, 'margin-left', '10', '%');
-            //setElementProperty(center, 'margin-right', '10', '%');
-
-            const centerCN = center.childNodes;
-            const searchBox         = centerCN[1];
-            const searchButtton     = centerCN[3];
-            const voiceSearchButton = centerCN[5];
-            const aiCompanionButton = centerCN[7];
-            const YTTMenuButton     = centerCN[9];
-
-            changeValue = 3 + trueDifference;
-            setElementProperty(center, 'height',  '', '');
-            setElementProperty(center, 'width',   '', '');
-            setElementProperty(center, 'display', '', '');
-
-
-            setElementProperty(searchBox, 'height', '', '');
-
-            //End
-            setElementProperty(end, 'margin-left', '', '');
-        }
-        catch(e) {
-            console.warn("(startVideoChecks) exception: Failed To Make Changes To Ribbon");
-        }
     }
 
 
@@ -903,16 +529,19 @@ KNOWN BUGS:
     }
 
 
+    function toggleShowWatched() {
+        getURL_id()===0 ? processVideos() : startVideoChecks();
+    }
 
 
-    function convertStringToNumber(num) { 
-        if (num.isInteger) { 
+    function convertStringToNumber(num) {
+        if (num.isInteger) {
             return num;
         }
-        if (num.includes("K")) { 
+        if (num.includes("K")) {
             return parseFloat(num) * 1e3;
         }
-        if (num.includes("M")) { 
+        if (num.includes("M")) {
             return parseFloat(num) * 1e6;
         }
         if (num.includes("B")) {
@@ -921,29 +550,55 @@ KNOWN BUGS:
         return parseFloat(num);
     }
 
+
     function getMetadata(video) {
         //console.debug(video);
         const url           = video.querySelector(".ytLockupMetadataViewModelTitle");
-        const title         = video.querySelector(".ytLockupMetadataViewModelHeadingReset").title;
+        let title;
+        try {
+            title = video.querySelector("span").textContent;   //video.querySelector(".ytLockupMetadataViewModelHeadingReset").title;
+        } catch { //Purchased media do this
+            title = video.querySelector('#video-title-link').textContent
+        }
         const otherMetadata = video.querySelectorAll(".ytContentMetadataViewModelMetadataRow");
-        const channel       = otherMetadata[0].textContent;
+        let channel;
         let views;
         let date;
-        switch (getURL_id()) { 
-            case 0: 
-                views = otherMetadata[1].children[0].textContent;
-                date  = otherMetadata[1].children[2].textContent;
-                break;
-            case 1:
-                views = otherMetadata[1].children[1].textContent;
-                date  = otherMetadata[1].children[3].textContent;
-                break;
-        }
         const duration = video.querySelector(".ytBadgeShapeText")?.textContent.trim();
+
+
+        if (otherMetadata.length > 1) {
+            try {
+                channel = otherMetadata[0].textContent;
+
+                if (duration == "LIVE") { //LIVE Video, does not use same nodes as normal videos
+                    views = otherMetadata[1].children[0].textContent;
+                }
+                else {
+                  switch (getURL_id()) {
+                      case 0:
+                          views = otherMetadata[1].children[0].textContent;
+                          date  = otherMetadata[1].children[2].textContent;
+                          break;
+                      case 1:
+                          views = otherMetadata[1].children[1].textContent;
+                          date  = otherMetadata[1].children[3].textContent;
+                          break;
+                  }
+                }
+            }
+            catch { //can occasionally fail to filter.
+                console.warn({video, otherMetadata})
+            }
+        }
+        //old locaiton of duration -> <-
         let   progress = video.querySelector(".ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment");
         progress = progress ? progress.style.width : "0%"
         return({url, title, channel, views, date, duration, progress});
     }
+
+
+
 
     function startVideoChecks() {
         //Videos: 'yt-lockup-view-model'
@@ -959,14 +614,14 @@ KNOWN BUGS:
                         query.dataset.logged = "true";
                     }
                     let progressBlocked = false;
-                    if (parseFloat(video.progress) >= localStorage.getItem('ytt-max-watch-percent')) { //conditions are met, check if it needs to be blocked 
+                    if (parseFloat(video.progress) >= localStorage.getItem('ytt-max-watch-percent')) { //conditions are met, check if it needs to be blocked
                         query.style.display = showWatched ? '' : 'none';
                         progressBlocked = true;
                     }
-                    if (video.date.includes("Streamed") && (convertStringToNumber(video.views) < localStorage.getItem('ytt-streamed-value'))) { //was Streamed, and has low views 
+                    if (video.date.includes("Streamed") && (convertStringToNumber(video.views) < localStorage.getItem('ytt-streamed-value'))) { //was Streamed, and has low views
                         query.style.display = showStreamed ? '' : 'none';
                     }
-                    else if (!progressBlocked) { //conditions not met, unblock it, unless it was already blocked by progress  
+                    else if (!progressBlocked) { //conditions not met, unblock it, unless it was already blocked by progress
                         query.style.display = '';
                     }
                 });
@@ -1021,12 +676,12 @@ KNOWN BUGS:
         if (contents) {
             const items = contents.querySelectorAll('ytd-rich-item-renderer');
             items.forEach(item => {
-                if (item.hasAttribute("is-shelf-item")) { 
-                    return; //ignoring shelf items for now like shorts (these also have no href associated, so it gets checked first)
-                }
-                if (item.querySelector(".ytLockupMetadataViewModelTitle").href.endsWith("radio=1")) { 
-                    return; //ignoring music videos for now
-                }
+                //if (item.hasAttribute("is-shelf-item")) {
+                //    return; //ignoring shelf items for now like shorts (these also have no href associated, so it gets checked first)
+                //}
+                //if (item.querySelector(".ytLockupMetadataViewModelTitle").href.endsWith("radio=1")) {
+                //    return; //ignoring music videos for now
+                //}
 
 
                 let video = getMetadata(item);
@@ -1034,64 +689,21 @@ KNOWN BUGS:
                     console.info(video);
                     item.dataset.logged = "true";
                 }
-                let progressBlocked = false;
-                if (parseFloat(video.progress) >= localStorage.getItem('ytt-max-watch-percent')) { //conditions are met, check if it needs to be blocked 
-                    item.style.display = showWatched ? '' : 'none';
-                    progressBlocked = true;
+
+
+                if (video.date) { //filters out shorts, which don't return a date
+                    let progressBlocked = false;
+                    if (parseFloat(video.progress) >= localStorage.getItem('ytt-max-watch-percent')) { //conditions are met, check if it needs to be blocked
+                        item.style.display = showWatched ? '' : 'none';
+                        progressBlocked = true;
+                    }
+                    if (video.date.includes("Streamed") && (convertStringToNumber(video.views) < localStorage.getItem('ytt-streamed-value'))) { //was Streamed, and has low views
+                        item.style.display = showStreamed ? '' : 'none';
+                    }
+                    else if (!progressBlocked) { //conditions not met, unblock it, unless it was already blocked by progress
+                        item.style.display = '';
+                    }
                 }
-                if (video.date.includes("Streamed") && (convertStringToNumber(video.views) < localStorage.getItem('ytt-streamed-value'))) { //was Streamed, and has low views 
-                    item.style.display = showStreamed ? '' : 'none';
-                }
-                else if (!progressBlocked) { //conditions not met, unblock it, unless it was already blocked by progress  
-                    item.style.display = '';
-                }
-
-
-
-
-
-
-
-
-
-
-
-
-
-//                let video = getMetadata(item);
-//                console.info(video);
-//
-//                item.removeAttribute('is-in-first-column');
-                
-                
-  
-
-                //const progressSegment = item.querySelector('.ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment');
-                //const watchedPercent = progressSegment ? parseFloat(progressSegment.style.width) || 0 : 0;
-                //const max = localStorage.getItem('ytt-max-watch-percent');
-//
-                //if (watchedPercent >= max) { //if max was 50, it would hide videos watched 50% or more, but conversely it also unhides videos below the threshold, unhiding things hidden by other toggles
-                //    item.style.display = showWatched ? '' : 'none';
-                //}
-                //else {
-                //    item.style.display = '';
-                //}
-
-//                if (enableLogging && !item.dataset.logged) {
-//                    try {
-//                        let metadata = item.querySelector('.ytLockupMetadataViewModelTextContainer');
-//                        
-//                        if (metadata) {
-//                            console.info(metadata);
-//                            item.dataset.logged = 'true';
-//                        }
-//
-//
-//                    }
-//                    catch (e) {
-//                        console.warn('metadata could not be found: ', e);
-//                    }
-//                }
             });
         }
     }
@@ -1282,7 +894,7 @@ KNOWN BUGS:
                 if (container2) {
                     container2.forEach(query => {
                         query.style.setProperty('--ytd-rich-grid-items-per-row', (number));
-                        console.debug(query.style.getPropertyValue('--ytd-rich-grid-items-per-row'));
+                        //console.debug(query.style.getPropertyValue('--ytd-rich-grid-items-per-row'));
                     });
                 }
 
@@ -1375,19 +987,6 @@ KNOWN BUGS:
                 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
                 //Low Priority | User has to hover or click something outside of common areas to see it
 
 
@@ -1417,38 +1016,24 @@ KNOWN BUGS:
     }
 
 
-
-
-  /*
-    function toggleNew() {
-        document.querySelectorAll('ytd-rich-item-renderer').forEach(item => {
-            const text = item.querySelector('text-element')?.textContent.trim().toLowerCase();
-            if (text && text.includes('youtube new_thing')) {
-                item.style.display = showNew ? '' : 'none';
-            }
-        });
-    }
-  */
-
     function homepageZoomOn() {
-
-            let zoom = Math.round(window.devicePixelRatio * 100);
-            const base = 3;
-            let difference = (100 - zoom)/10;
-            if (difference > 0) {
-                const container = document.querySelector('ytd-rich-grid-renderer');
-                if (container) {
-                    container.style.setProperty('--ytd-rich-grid-items-per-row', (base+difference));
-                }
-                //shelfs seem to make their own properties, or they have a different parent that was not found, so each shelf is checked
-                const container2 = document.querySelectorAll('ytd-rich-shelf-renderer');
-                if (container2) {
-                    container2.forEach(query => {
-                        query.style.setProperty('--ytd-rich-grid-items-per-row', ((base+3)+difference));
-                    });
-                }
-                document.documentElement.style.fontSize = (10 + difference*2) + "px";
+        let zoom = Math.round(window.devicePixelRatio * 100);
+        const base = 3;
+        let difference = (100 - zoom)/10;
+        if (difference > 0) {
+            const container = document.querySelector('ytd-rich-grid-renderer');
+            if (container) {
+                container.style.setProperty('--ytd-rich-grid-items-per-row', (base+difference));
             }
+            //shelfs seem to make their own properties, or they have a different parent that was not found, so each shelf is checked
+            const container2 = document.querySelectorAll('ytd-rich-shelf-renderer');
+            if (container2) {
+                container2.forEach(query => {
+                    query.style.setProperty('--ytd-rich-grid-items-per-row', ((base+3)+difference));
+                });
+            }
+            document.documentElement.style.fontSize = (10 + difference*2) + "px";
+        }
     }
 
     function homepageZoomOff() {
@@ -1465,19 +1050,19 @@ KNOWN BUGS:
             });
         }
         document.documentElement.style.fontSize = (10) + "px";
-
     }
 
+
+
+    function toggleBetterZoom() {
+      getURL_id()===0&&enableBetterZoom?homepageZoomOn():homepageZoomOff();
+    }
 
     function checkItemsPerRow() {
         if (enableBetterZoom) {
             homepageZoomOn();
         }
     }
-
-
-
-
 
 
     function setMenuEl(menu) {
@@ -1497,11 +1082,9 @@ KNOWN BUGS:
         const button = getMenuButtonEl();
         const menu = getMenuEl();
 
-
         const rect = button.getBoundingClientRect();
         menu.style.top = rect.bottom + 0 + 'px';
         menu.style.left = rect.left + 'px';
-        //menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
         menu.hidden = !menu.hidden;
 
     }
@@ -1541,280 +1124,244 @@ KNOWN BUGS:
     }
 
 
-    function populateMenuContainer(menuContainer) {
-        const createLabel = (labelText, fontSize) => {
-            const wrapper = document.createElement('div');
-            wrapper.style.display = 'flex';
-            wrapper.style.alignItems = 'center';
-            wrapper.style.marginBottom = '5px';
-            const label = document.createElement('label');
-            label.textContent = labelText;
-            label.style.marginLeft = '0px';
-            label.style.fontSize = fontSize;
-            label.style.fontWeight = 'bold';
-            wrapper.appendChild(label);
-            return wrapper;
-        };
 
-        const createToggle = (toggleName) => {
-            let toggle = document.createElement(toggleName);
-            toggle.id="options"
-            toggle.className="style-scope ytd-settings-options-renderer"
-            toggle.style.marginLeft = '25px';
-            let ytd_settings_switch_renderer = document.createElement('ytd-settings-switch-renderer');
+  //======================================================================================================
+
+
+    function createBaseToggleButton(toggleName) {
+        let toggle = document.createElement(toggleName);
+        toggle.id="options"
+        toggle.className="style-scope ytd-settings-options-renderer"
+        toggle.style.marginLeft = '5px'; //was 25px
+        let ytd_settings_switch_renderer = document.createElement('ytd-settings-switch-renderer');
+        ytd_settings_switch_renderer.className = "style-scope ytd-settings-options-renderer";
+        ytd_settings_switch_renderer.style.margin = '0px';
+        toggle.appendChild(ytd_settings_switch_renderer);
+        return toggle;
+    }
+
+    function createInitialzedToggleButton(toggleName, key, onChange, text, tooltip) {
+        const toggle = document.querySelector(toggleName);
+        const toggleButton = toggle.querySelector('tp-yt-paper-toggle-button');
+        toggleButton.checked = localStorage.getItem(key) === "true";
+
+        toggleButton.addEventListener('change', () => {
+            localStorage.setItem(key, toggleButton.checked);
+            onChange();
+        });
+
+        const textEls = toggle.querySelectorAll('yt-formatted-string');
+        const titleEl = textEls[0];
+        //const subtitleEl = textEls[2];
+
+        toggle.querySelector('yt-img-shadow').remove();
+
+        titleEl.parentElement.style.display = 'ruby';
+        titleEl.removeAttribute('is-empty');
+        titleEl.textContent = text;
+
+        //subtitleEl.removeAttribute('is-empty');
+        //subtitleEl.textContent = subtitle;
+
+        titleEl.title = tooltip;
+    }
+
+    function addToggle(menu, toggleName, key, onChange, text, tooltip) {
+        let button = createBaseToggleButton(toggleName);
+        menu.append(button);
+        createInitialzedToggleButton(toggleName, key, onChange, text, tooltip);
+    }
+
+    function createBaseToggleButtonChild(toggleName) {
+        let childToggle = document.createElement(toggleName);
+            childToggle.id="options"
+            childToggle.className="style-scope ytd-settings-options-renderer"
+            childToggle.style.marginLeft = '20px'; //was 25px
+        let ytd_settings_switch_renderer = document.createElement('ytd-settings-switch-renderer');
             ytd_settings_switch_renderer.className = "style-scope ytd-settings-options-renderer";
             ytd_settings_switch_renderer.style.margin = '0px';
-            toggle.appendChild(ytd_settings_switch_renderer);
-            return toggle;
-        };
+
+        childToggle.appendChild(ytd_settings_switch_renderer);
+        return childToggle;
+    }
+
+    function addToggleChild(parentToggleName, menu, toggleName, key, onChange, text, tooltip) {
+
+        let childButton = createBaseToggleButtonChild(toggleName);
+        menu.append(childButton);
+
+        let parentButton = document.querySelector(parentToggleName);
+        parentButton.appendChild(childButton);
+
+        createInitialzedToggleButton(toggleName, key, onChange, text, tooltip);
+    }
 
 
-      menuContainer.append(
-/*======================================================
-*        GLOBAL TOGGLES
-*======================================================*/
-        createLabel("Global Toggles", "15px"),
-          createLabel("Core UI", '10px'),
-            createToggle('showCountryCode'),
-            createToggle('ShowAI'),
-            createToggle('showEndButtons'),
-                createToggle('showCreateButton'),
-                createToggle('showNotifications'),
-                createToggle('showPfp'),
-/*======================================================
-*        HOME PAGE TOGGLES
-*======================================================*/
-        createLabel("Homepage Toggles", '15px'),
-            createToggle('ShowPrimaryHeader'),
-            createToggle('ShowGuide'),
-                createToggle('showSubscriptions'),
-            createLabel("Blocks of Content", '10px'),
-              createToggle('ShowBanners'),
-              createToggle('ShowShorts'),
-              createToggle('ShowGames'),
-              createToggle('ShowBreakingNews'),
-              createToggle('ShowPosts'),
-              createToggle('ShowExploreMoreTopics'),
-              createToggle('ShowWhatDidYouThink'),
-            createLabel("Types of Videos", '10px'),
-              createToggle('ShowMusic'),
-              createToggle('ShowPlaylistsandPodcasts'),
-              createToggle('ShowNewToYouMessage'),
-              createToggle('ShowWatchedVideos'),
-              createToggle('ShowPurchasedVideos'),
-              createToggle('ShowFreeMovies'),
-              createToggle('ShowMemberOnly'),
-              createToggle('ShowSponsored'),
-              createToggle('ShowLivestreams'),
-              createToggle('ShowStreamed'),
+
+    function addToggleLabel(menu, labelText, fontSize) {
+        const wrapper = document.createElement('div');
+        wrapper.style.display = 'flex';
+        wrapper.style.alignItems = 'center';
+        wrapper.style.marginBottom = '5px';
+        const label = document.createElement('label');
+        label.textContent = labelText;
+        label.style.marginLeft = '0px';
+        label.style.fontSize = fontSize;
+        label.style.fontWeight = 'bold';
+        wrapper.appendChild(label);
+        menu.append(wrapper);
+        //return wrapper;
+    }
+
+    function addToggleField(toggleName, key, onChange, min, max, dv, type, id, tooltip) {
+        let toggleButton = document.querySelector(toggleName).querySelector('#title');
+        let input = document.createElement("input");
+        input.style.marginLeft = "10px";
+        input.type = type;
+        input.id   = id;
+        input.name = id;
+        input.min  = 0;
+        input.max  = 1e6;
+        input.value = localStorage.getItem(key);
+        if (input.value === "") { //field key has no value
+            input.value = localStorage.setItem(key, dv);
+        }
+        input.addEventListener('change', () => {
+            localStorage.setItem(key, input.value);
+            onChange();
+        });
+        input.title = tooltip;
+        toggleButton.appendChild(input);
+    }
+
+//======================================================================================================
+    function BuildMenuContainer(menuContainer) {
+        document.body.appendChild(menuContainer);
+        /*======================================================
+        *        GLOBAL TOGGLES
+        *======================================================*/
+        addToggleLabel(menuContainer, "Global Toggles", "15px");
+        addToggleLabel(menuContainer, "Core UI", '10px');
+             addToggle(menuContainer,                           'showCountryCode',    'ytt-show-country-code',  () => { showCountryCode   = !showCountryCode;   toggleCountryCode();        }, "Country Code",        "top right of YouTube Logo");
+             addToggle(menuContainer,                           'showAI',             'ytt-show-ai',            () => { showAI            = !showAI;            toggleAI();                 }, "AI Features",         "'AI' search, summaries, and buttons");
+             addToggle(menuContainer,                           'showEndButtons',     'ytt-show-end-buttons',   () => { showEndButtons    = !showEndButtons;    toggleEndButtons();         }, "End Buttons",         "all buttons on the end");
+                addToggleChild('showEndButtons', menuContainer, 'showCreateButton',   'ytt-show-create-button', () => { showCreateButton  = !showCreateButton;  toggleCreateButton();       }, "Create Button",       "button to create videos");
+                addToggleChild('showEndButtons', menuContainer, 'showNotifications',  'ytt-show-notifications', () => { showNotifications = !showNotifications; toggleNotificationButton(); }, "notification button", "notification in the top right");
+                addToggleChild('showEndButtons', menuContainer, 'showPfp',            'ytt-show-pfp',           () => { showPfp           = !showPfp;           togglePFP();                }, "PFP",                 "show profile picture button");
+        /*======================================================
+        *        HOME PAGE TOGGLES
+        *======================================================*/
+        addToggleLabel(menuContainer, "Homepage Toggles", '15px');
+             addToggle(menuContainer,                      'showPrimaryHeader', 'ytt-show-primary-header', () => { showPrimaryHeader = !showPrimaryHeader; togglePrimaryHeader(); }, "Primary Header", "Tag header above homepage recommendations");
+             addToggle(menuContainer,                      'showGuide',         'ytt-show-guide',          () => { showGuide         = !showGuide        ; toggleGuide();         }, "Guide",          "The left side (Subscriptions, You, Explore, etc.)");
+                addToggleChild('showGuide', menuContainer, 'showSubscriptions', 'ytt-show-subscriptions',  () => { showSubscriptions = !showSubscriptions; toggleSubscriptions(); }, "Subscriptions",  "Homepage subscriptions on the left guide");
+                
+        addToggleLabel(menuContainer, "Blocks of Content", '10px');
+             addToggle(menuContainer, 'showBanners',           'ytt-show-banners',              () => { showBanner            = !showBanner            ;startShelfChecks(); }, "Banners",             "Turns on Banners");
+             addToggle(menuContainer, 'showShorts',            'ytt-show-shorts',               () => { showShorts            = !showShorts            ;startShelfChecks(); }, "Shorts",              "Homepage Shorts");
+             addToggle(menuContainer, 'showGames',             'ytt-show-games',                () => { showGames             = !showGames             ;startShelfChecks(); }, "Playables",           "Homepage Games");
+             addToggle(menuContainer, 'showBreakingNews',      'ytt-breaking-news',             () => { showBreakingNews      = !showBreakingNews      ;startShelfChecks(); }, "Breaking News",       "Breaking News On");
+             addToggle(menuContainer, 'showPosts',             'ytt-show-posts',                () => { showPosts             = !showPosts             ;startShelfChecks(); }, "Creator Posts",       "Creator Posts On");
+             addToggle(menuContainer, 'showExploreMoreTopics', 'ytt-show-explore-more-topics',  () => { showExploreMoreTopics = !showExploreMoreTopics ;startShelfChecks(); }, "Explore More Topics", "Explore Topics On");
+             addToggle(menuContainer, 'showWhatDidYouThink',   'ytt-what-did-you-think',        () => { showWhatDidYouThink   = !showWhatDidYouThink   ;startShelfChecks(); }, "Rating Videos",       "The 'What did you think of this video?' messages");
+
+        addToggleLabel(menuContainer, "Types of Videos", '10px');
+             addToggle(menuContainer, 'showMusic',                'ytt-show-music',       () => { showMusic     = !showMusic;     startItemBadgeChecks(); }, "Music",                "Music in video format");
+             addToggle(menuContainer, 'showPlaylistsandPodcasts', 'ytt-show-playlists',   () => { showPlaylists = !showPlaylists; startItemChecks();      }, "Playlists & Podcasts", "Turns on Playlists & Podcasts");
+             addToggle(menuContainer, 'showNewToYouMessage',      'ytt-show-new-to-you',  () => { showNewToYou  = !showNewToYou;  startItemChecks();      }, "New To You Message",   "Turns on New To You / Looking for something different Message");
+             addToggle(menuContainer, 'showWatchedVideos',        'ytt-show-watched',     () => { showWatched   = !showWatched;   toggleShowWatched();    }, "Watched Videos",       "(When off) Videos Above This Watch Percentage Are Hidden: ");
+                       addToggleField('showWatchedVideos',        'ytt-max-watch-percent',() => { toggleShowWatched()}, 0, 100, 100, "number", "ytt-watched-id",                     "Percent (Greater Than Equal Gets Hidden)");
+             addToggle(menuContainer, 'showPurchasedVideos',      'ytt-show-purchased',   () => { showPurchased   = !showPurchased;     startItemBadgeChecks(); }, "Purchased Media",  "Turns on Purchased Media");
+             addToggle(menuContainer, 'showFreeMovies',           'ytt-show-free-movies', () => { showFreeMovies  = !showFreeMovies;    startItemBadgeChecks(); }, "Free Movies",      "Turns on Free & Primetime Movies");
+             addToggle(menuContainer, 'showMemberOnly',           'ytt-show-member-only', () => { showMemberOnly  = !showMemberOnly;    toggleMembersOnly();    }, "Member Only",      "Turns on Members Only Videos");
+             addToggle(menuContainer, 'showSponsored',            'ytt-show-sponsored',   () => { showSponsored   = !showSponsored;     startItemBadgeChecks(); }, "Sponsored",        "Turns on Sponsored Video Ads");
+             addToggle(menuContainer, 'showLivestreams',          'ytt-show-livestreams', () => { showLivestreams = !showLivestreams;   startItemBadgeChecks(); }, "Livestreams",      "Turns on Livestreams");
+             addToggle(menuContainer, 'showStreamed',             'ytt-show-streamed',    () => { showStreamed    = !showStreamed;      startVideoChecks();     }, "Past Livestreams", "Turns on Past Livestreams (streamed)");
+                       addToggleField('showStreamed',             'ytt-streamed-value',   () => { startVideoChecks()}, 0, 1e12, 1e12, "number", "ytt-streamed-id", "Views (Less Than Equal Gets Hidden)");
+            //_inputField('ShowStreamed'          ,'ytt-streamed-value', 1e12, "number", "ytt-streamed-id");
       /*======================================================
        *        WATCH PAGE TOGGLES
        *======================================================*/
-          createLabel("Watchpage Toggles", '15px'),
-            createLabel("Core UI"),
-              createToggle('ShowRecommendations'),
-              createToggle('ShowEndScreenVideos'),
-              createToggle('ShowBelow'),
-              createToggle('ShowMerchStore'),
-                createToggle('ShowComments'),
-                    createToggle('ShowCommentingField'),
-                    createToggle('showReplyButton'),
+        addToggleLabel(menuContainer, "Watchpage Toggles", '15px');
+        addToggleLabel(menuContainer, "Core UI");
+             addToggle(menuContainer,                             'showRecommendations', 'ytt-show-recommendations',   () => { showRecommedations  = !showRecommedations;  toggleRecommendations(); }, "Recommendations",   "Recommendation section on video watchpages");
+             addToggle(menuContainer,                             'showEndScreenVideos', 'ytt-show-end-screen-videos', () => { showEndScreenVideos = !showEndScreenVideos; toggleEndScreenVideos(); }, "End Screen Videos", "Videos recommended when a video ends");
+             addToggle(menuContainer,                             'showBelow',           'ytt-show-below',             () => { showBelow           = !showBelow;           toggleBelow();           }, "Below Player",      "Everything below the video's player");
+                addToggleChild('showBelow', menuContainer,        'showMerchStore',      'ytt-show-merch-store',       () => { showMerchStore      = !showMerchStore;      toggleMerchStore();      }, "Merch Store",       "The Shop Section under videos");
+                addToggleChild('showBelow', menuContainer,        'showComments',        'ytt-show-comments',          () => { showComments        = !showComments;        toggleComments();        }, "Comments",          "The entire comment section");
+                    addToggleChild('showComments', menuContainer, 'showCommentingField', 'ytt-show-commenting-field',  () => { showCommentingField = !showCommentingField; toggleCommentingField(); }, "Commenting Field",  "The place that you type and submit comments");
+                    addToggleChild('showComments', menuContainer, 'showReplyButton',     'ytt-show-reply-button',      () => { showReplyButton     = !showReplyButton;     toggleReplyButton();     }, "Reply Button",      "reply buttons in comments");
       /*======================================================
        *        DEVELOPER TOGGLES
        *======================================================*/
-          createLabel("Developer Tool Toggles", '15px'),
-          //createToggle('DebugMode'),
-            createLabel("Experimental Toggles", '10px'),
-              createToggle('EnableBetterZoom'),
-              createToggle('EnableStreamerMode'),
-              createToggle('ShowLabsFeature'),
-              createToggle('enableExperimental'),
-            createLabel("Console Logs", '10px'),
-              createToggle('LogMetadata'),
-        );
-        document.body.appendChild(menuContainer);
+        addToggleLabel(menuContainer, "Developer Tool Toggles", '15px');
+          addToggleLabel(menuContainer, "Experimental Toggles", '10px');
+            //initToggle('DebugMode',                 'ytt-debug-mode',                 () => { debugMode             = !debugMode;                                               }, "DebugMode"             ,"Console Logs more step by step function calling"          );
+            addToggle(menuContainer, 'enableBetterZoom',   'ytt-enable-better-zoom',   () => { enableBetterZoom   = !enableBetterZoom;   toggleBetterZoom();   }, "Better Zoon",   "Allows content to fill the screen better when zooming out");                                                                                                                               /*if (getURL_id() === 0 && enableBetterZoom) {homepageZoomOn();} else{homepageZoomOff();}*/
+            addToggle(menuContainer, 'enableStreamerMode', 'ytt-enable-streamer-mode', () => { enableStreamerMode = !enableStreamerMode; toggleStreamerMode(); }, "Streamer Mode", "Tries Removing Identifying Information (*not perfect*)");
+            addToggle(menuContainer, 'showLabsFeature',    'ytt-show-labs-feature',    () => { showLabsFeature    = !showLabsFeature;    toggleLabsFeature();  }, "Labs Feature",  "Currently Does Nothing");
+            addToggle(menuContainer, 'logMetadata',        'ytt-logging',              () => { enableLogging      = !enableLogging;      processVideos();      }, "LogMetadata",   "Console Logs videos metadata loading in the DOM");
+            addToggle(menuContainer, 'enableExperimental', 'ytt-enable-experimental',  () => { enableExperimental = !enableExperimental; toggleExperimental(); }, "Experimental",  "Experimental toggles (read source code)");
+                      addToggleField('enableExperimental', 'ytt-experimental-value',   () => { toggleExperimental()}, 0, 1e6, -1, "number", "ytt-experiemental-id", "Videos (Per Row On Homepage)");
     }
 
 
-
-    function initializeToggleButtons() {
-        const initToggle = (toggleName, key, onChange, title, subtitle) => {
-            const toggle = document.querySelector(toggleName);
-            const toggleButton = toggle.querySelector('tp-yt-paper-toggle-button');
-            toggleButton.checked = localStorage.getItem(key) === "true";
-
-            toggleButton.addEventListener('change', () => {
-                localStorage.setItem(key, toggleButton.checked);
-                onChange();
-            });
-
-            const textEls = toggle.querySelectorAll('yt-formatted-string');
-            const titleEl = textEls[0];
-            const subtitleEl = textEls[2];
-
-            toggle.querySelector('yt-img-shadow').remove();
-
-            titleEl.parentElement.style.display = 'ruby';
-            titleEl.removeAttribute('is-empty');
-            titleEl.textContent = title;
-
-            subtitleEl.removeAttribute('is-empty');
-            subtitleEl.textContent = subtitle;
-        }
-
-
-
-
-
-        const inputField = (toggleName, key) => {   //This is really only for the WatchedPercent variable, so function might need a new 'default value' parameter
-            let toggleSubtitle = document.querySelector(toggleName).querySelector('#subtitle');
-            let input = document.createElement("input");
-            input.type = "number";
-            input.id   = "maxWatchProgress";
-            input.name = "maxWatchProgress";
-            input.min  = "0";
-            input.max  = "100";
-            input.value = localStorage.getItem(key);
-            if (input.value === "") {
-                input.value = localStorage.setItem(key, 100);
-            }
-            //""===input.value&&(input.value=localStorage.setItem(t,100)),
-            input.addEventListener('change', () => {
-                localStorage.setItem(key, input.value);
-            });
-            toggleSubtitle.appendChild(input);
-        }
-
-
-        const _inputField = (toggleName, key, dv, type, id) => {
-            let toggleSubtitle = document.querySelector(toggleName).querySelector('#subtitle');
-            let input = document.createElement("input");
-            input.type = type;
-            input.id   = id;
-            input.name = id;
-            //input.min  = "0";
-            //input.max  = "100";
-            input.value = localStorage.getItem(key);
-            if (input.value === "") { //field key has no value
-                input.value = localStorage.setItem(key, dv);
-            }
-            input.addEventListener('change', () => {
-                localStorage.setItem(key, input.value);
-            });
-            toggleSubtitle.appendChild(input);
-        }
-
-
-
-
-
-
-
-        //This is for example purposes
-        //if (debugMode) {
-        //    initToggle('ShowToggle','ytt-show-toggle',()=>{showToggle=!showToggle,startToggleChecks()},"This is a title","This is a subtitle");
-        //  //inputField('ShowToggle', 'ytt-show-toggle-field-variable');
-        //}
-/*======================================================
-*        GLOBAL TOGGLES
-*======================================================*/
-        initToggle('showCountryCode'           ,'ytt-show-country-code'          ,() => { showCountryCode         = !showCountryCode         ;toggleCountryCode()            ;}, "Country Code"          ,"top right of YouTube Logo"             );
-        initToggle('ShowAI'                    ,'ytt-show-ai'                    ,() => { showAI                  = !showAI                  ;toggleAI()                     ;}, "AI Features"           ,"'AI' search, summaries, and buttons"   );
-        initToggle('showEndButtons'            ,'ytt-show-end-buttons'           ,() => { showEndButtons          = !showEndButtons          ;toggleEndButtons()             ;}, "End Buttons"           ,"all buttons on the end"                );
-         initToggle('showCreateButton'         ,'ytt-show-create-button'         ,() => { showCreateButton        = !showCreateButton        ;toggleCreateButton()           ;}, "Create Button"         ,"button to create videos"               );
-         initToggle('showNotifications'        ,'ytt-show-notifications'         ,() => { showNotifications       = !showNotifications       ;toggleNotificationButton()     ;}, "notification button"   ,"notification in the top right"         );
-         initToggle('showPfp'                  ,'ytt-show-pfp'                   ,() => { showPfp                 = !showPfp                 ;togglePFP()                    ;}, "PFP"                   ,"show profile picture button"           );
-/*======================================================
-*        HOME PAGE TOGGLES
-*======================================================*/
-        initToggle('ShowPrimaryHeader'         ,'ytt-show-primary-header'        ,() => { showPrimaryHeader     = !showPrimaryHeader       ;togglePrimaryHeader()                                            ;}, "Primary Header"        ,"Tag header above homepage recommendations"                       );
-        initToggle('ShowGuide'                 ,'ytt-show-guide'                 ,() => { showGuide             = !showGuide               ;toggleGuide()                                                    ;}, "Guide"                 ,"The left side (Subscriptions, You, Explore, etc.)"               );
-         initToggle('showSubscriptions'        ,'ytt-show-subscriptions'         ,() => { showSubscriptions     = !showSubscriptions       ;toggleSubscriptions()                                            ;}, "Subscriptions"         ,"Homepage subscriptions on the left guide"                        );
-        initToggle('ShowBanners'               ,'ytt-show-banners'               ,() => { showBanner            = !showBanner              ;startShelfChecks()                                               ;}, "Banners"               ,"Turns on Banners"                                                );
-        initToggle('ShowShorts'                ,'ytt-show-shorts'                ,() => { showShorts            = !showShorts              ;startShelfChecks()                                               ;}, "Shorts"                ,"Homepage Shorts"                                                 );
-        initToggle('ShowGames'                 ,'ytt-show-games'                 ,() => { showGames             = !showGames               ;startShelfChecks()                                               ;}, "Playables"             ,"Homepage Games"                                                  );
-        initToggle('ShowBreakingNews'          ,'ytt-breaking-news'              ,() => { showBreakingNews      = !showBreakingNews        ;startShelfChecks()                                               ;}, "Breaking News"         ,"Breaking News On"                                                );
-        initToggle('ShowPosts'                 ,'ytt-show-posts'                 ,() => { showPosts             = !showPosts               ;startShelfChecks()                                               ;}, "Creator Posts"         ,"Creator Posts On"                                                );
-        initToggle('ShowExploreMoreTopics'     ,'ytt-show-explore-more-topics'   ,() => { showExploreMoreTopics = !showExploreMoreTopics   ;startShelfChecks()                                               ;}, "Explore More Topics"   ,"Explore Topics On"                                               );
-        initToggle('ShowWhatDidYouThink'       ,'ytt-what-did-you-think'         ,() => { showWhatDidYouThink   = !showWhatDidYouThink     ;startShelfChecks()                                               ;}, "Rating Videos"         ,"The 'What did you think of this video?' messages"                );
-        initToggle('ShowMusic'                 ,'ytt-show-music'                 ,() => { showMusic             = !showMusic               ;startItemBadgeChecks()                                           ;}, "Music"                 ,"Music in video format"                                           );
-        initToggle('ShowPlaylistsandPodcasts'  ,'ytt-show-playlists'             ,() => { showPlaylists         = !showPlaylists           ;startItemChecks()                                                ;}, "Playlists & Podcasts"  ,"Turns on Playlists & Podcasts"                                   );
-        initToggle('ShowNewToYouMessage'       ,'ytt-show-new-to-you'            ,() => { showNewToYou          = !showNewToYou            ;startItemChecks()                                                ;}, "New To You Message"    ,"Turns on New To You / Looking for something different Message"   );
-        initToggle('ShowWatchedVideos'         ,'ytt-show-watched'               ,() => { showWatched           = !showWatched             ;getURL_id()===0 ? processVideos() : startVideoChecks()           ;}, "Watched Videos"        ,"(When off) Videos Above This Watch Percentage Are Hidden: "      );
-            inputField('ShowWatchedVideos'     ,'ytt-max-watch-percent');
-        initToggle('ShowPurchasedVideos'       ,'ytt-show-purchased'             ,() => { showPurchased         = !showPurchased           ;startItemBadgeChecks()                                           ;}, "Purchased Videos"      ,"Turns on Purchased Videos"           );
-        initToggle('ShowFreeMovies'            ,'ytt-show-free-movies'           ,() => { showFreeMovies        = !showFreeMovies          ;startItemBadgeChecks()                                           ;}, "Free Movies"           ,"Turns on Free & Primetime Movies"    );
-        initToggle('ShowMemberOnly'            ,'ytt-show-member-only'           ,() => { showMemberOnly        = !showMemberOnly          ;toggleMembersOnly()                                              ;}, "Member Only"           ,"Turns on Members Only Videos"        );
-        initToggle('ShowSponsored'             ,'ytt-show-sponsored'             ,() => { showSponsored         = !showSponsored           ;startItemBadgeChecks()                                           ;}, "Sponsored"             ,"Turns on Sponsored Video Ads"        );
-        initToggle('ShowLivestreams'           ,'ytt-show-livestreams'           ,() => { showLivestreams       = !showLivestreams         ;startItemBadgeChecks()                                           ;}, "Livestreams"           ,"Turns on Livestreams"                );
-        initToggle('ShowStreamed'              ,'ytt-show-streamed'              ,() => { showStreamed          = !showStreamed            ;startVideoChecks()                                               ;}, "Past Livestreams"      ,"Turns on Past Livestreams (streamed)");
-            _inputField('ShowStreamed'          ,'ytt-streamed-value', 1e12, "number", "ytt-streamed-id");
-/*======================================================
-*        WATCH PAGE TOGGLES
-*======================================================*/
-        initToggle('ShowRecommendations'       ,'ytt-show-recommendations'       ,() => { showRecommedations    = !showRecommedations      ;toggleRecommendations()                                          ;}, "Recommendations"       ,"Recommendation section on video watchpages"          );
-        initToggle('ShowEndScreenVideos'       ,'ytt-show-end-screen-videos'     ,() => { showEndScreenVideos   = !showEndScreenVideos     ;toggleEndScreenVideos()                                          ;}, "End Screen Videos"     ,"Videos recommended when a video ends"                );
-        initToggle('ShowBelow'                 ,'ytt-show-below'                 ,() => { showBelow             = !showBelow               ;toggleBelow()                                                    ;}, "Below Player"          ,"Everything below the video's player"                 );
-        initToggle('ShowMerchStore'            ,'ytt-show-merch-store'           ,() => { showMerchStore        = !showMerchStore          ;toggleMerchStore()                                               ;}, "Merch Store"           ,"The Shop Section under videos"                       );
-        initToggle('ShowComments'              ,'ytt-show-comments'              ,() => { showComments          = !showComments            ;toggleComments()                                                 ;}, "Comments"              ,"The entire comment section"                          );
-         initToggle('ShowCommentingField'      ,'ytt-show-commenting-field'      ,() => { showCommentingField   = !showCommentingField     ;toggleCommentingField()                                          ;}, "Commenting Field"      ,"The place that you type and submit comments"         );
-         initToggle('showReplyButton'          ,'ytt-show-reply-button'          ,() => { showReplyButton       = !showReplyButton         ;toggleReplyButton()                                              ;}, "Reply Button"          ,"reply buttons in comments"                           );
-/*======================================================
-*        DEVELOPER TOGGLES
-*======================================================*/
-        //initToggle('DebugMode',                 'ytt-debug-mode',                 () => { debugMode             = !debugMode;                                                                                     }, "DebugMode"             ,"Console Logs more step by step function calling"             );
-        initToggle('EnableBetterZoom'          ,'ytt-enable-better-zoom'         ,() => { enableBetterZoom      = !enableBetterZoom        ;getURL_id()===0&&enableBetterZoom?homepageZoomOn():homepageZoomOff() ;}, "Better Zoon"           ,"Allows content to fill the screen better when zooming out"   );                                                                                                                               /*if (getURL_id() === 0 && enableBetterZoom) {homepageZoomOn();} else{homepageZoomOff();}*/
-        initToggle('EnableStreamerMode'        ,'ytt-enable-streamer-mode'       ,() => { enableStreamerMode    = !enableStreamerMode      ;toggleStreamerMode()                                                 ;}, "Streamer Mode"         ,"Tries Removing Identifying Information (*not perfect*)"      );
-        initToggle('ShowLabsFeature'           ,'ytt-show-labs-feature'          ,() => { showLabsFeature       = !showLabsFeature         ;toggleLabsFeature()                                                  ;}, "Labs Feature"          ,"Currently Does Nothing"                                      );
-        initToggle('LogMetadata'               ,'ytt-logging'                    ,() => { enableLogging         = !enableLogging           ;processVideos()                                                      ;}, "LogMetadata"           ,"Console Logs videos metadata loading in the DOM"             );
-        initToggle('enableExperimental'        ,'ytt-enable-experimental'        ,() => { enableExperimental    = !enableExperimental      ;toggleExperimental()                                                 ;}, "Experimental"          ,"Experimental toggles (read source code)"                     );
-            _inputField('enableExperimental'     ,'ytt-experimental-value', -1, "number", "ytt-experiemental-id");
-    }
-
-
-
-  /*
-   *
-   * TODO: memoisation
-   *       fix/show the tooltip
-   *
-   */
     function createMenuButton() {
         const voiceSearchButton = document.querySelector('#voice-search-button');
 
 
-        let replicatedButton = document.createElement('div'), btnStyle = replicatedButton.style;
-          replicatedButton.id = 'replicatedButton';
-          replicatedButton.className = 'style-scope ytd-masthead';
+        let yttButton = document.createElement('div'), btnStyle = yttButton.style;
+          yttButton.id = 'yttButton';
+          yttButton.className = 'style-scope ytd-masthead';
 
         let ytd_button_renderer = document.createElement('ytd-button-renderer');
           ytd_button_renderer.className = 'style-scope ytd-masthead';
 
-        replicatedButton.appendChild(ytd_button_renderer)
+        yttButton.appendChild(ytd_button_renderer)
 
-        document.querySelector("#center").appendChild(replicatedButton);
+        document.querySelector("#center").appendChild(yttButton);
 
-        const tp_yt_paper_tooltip = replicatedButton.querySelector('tp-yt-paper-tooltip')
-          tp_yt_paper_tooltip.removeAttribute('disable-upgrade');
-          tp_yt_paper_tooltip.querySelector('#tooltip').append('example text')
 
-        replicatedButton.querySelector('yt-button-shape').after(voiceSearchButton.querySelector('yt-button-shape').cloneNode(true));
-        replicatedButton.querySelector('path').setAttribute('d', 'M21 5H3a1 1 0 000 2h18a1 1 0 100-2Zm-3 6H6a1 1 0 000 2h12a1 1 0 000-2Zm-3 6H9a1 1 0 000 2h6a1 1 0 000-2Z')
-        replicatedButton.style.borderRadius = '100px';
-        replicatedButton.style.marginLeft = '12px';
-        replicatedButton.style.backgroundColor = 'var(--yt-sys-color-baseline--additive-background)';
+
+
+        let tp_yt_paper_tooltip = yttButton.querySelector('tp-yt-paper-tooltip');
+        tp_yt_paper_tooltip.removeAttribute('disable-upgrade');
+        tp_yt_paper_tooltip.querySelector('#tooltip').append('Toggle Features');
+        tp_yt_paper_tooltip.style.opacity = "0.9";
+
+
+       yttButton.onmouseover = function() {
+            yttButton.querySelector('#tooltip').className = "show style-scope tp-yt-paper-tooltip";
+            let rect = yttButton.getBoundingClientRect();
+            tp_yt_paper_tooltip.style.left = rect.x - rect.width + 'px';
+            tp_yt_paper_tooltip.style.top = rect.y + rect.height + 6 + 'px';
+       }
+       yttButton.onmouseout = function() {
+           yttButton.querySelector('#tooltip').className = "hidden style-scope tp-yt-paper-tooltip";
+       }
+
+
+
+
+
+
+
+        yttButton.querySelector('yt-button-shape').after(voiceSearchButton.querySelector('yt-button-shape').cloneNode(true));
+        yttButton.querySelector('path').setAttribute('d', 'M21 5H3a1 1 0 000 2h18a1 1 0 100-2Zm-3 6H6a1 1 0 000 2h12a1 1 0 000-2Zm-3 6H9a1 1 0 000 2h6a1 1 0 000-2Z');
+
+        yttButton.style.borderRadius = '100px';
+        yttButton.style.marginLeft = '12px';
+        yttButton.style.backgroundColor = 'var(--yt-sys-color-baseline--additive-background)';
 
         const menu = createMenu();
-        checkPerformance1Arg(populateMenuContainer, menu);
-        //populateMenuContainer(menu);
-        initializeToggleButtons();
+        BuildMenuContainer(menu);
 
-        setMenuButtonEl(replicatedButton);
+        setMenuButtonEl(yttButton);
         setMenuEl(menu);
         window.onresize = updateMenu;
-        replicatedButton.onclick = function() {
+
+        yttButton.onclick = function() {
           toggleMenu();
-          //checkPerformance(toggleMenu);
         };
 
     }
@@ -1857,10 +1404,6 @@ KNOWN BUGS:
           startShelfChecks();
           startItemChecks();
           startItemBadgeChecks();
-
-
-
-
       }
 
       function watchpageCalls() {
@@ -1896,6 +1439,7 @@ KNOWN BUGS:
         try {
             const observer = new MutationObserver(() => {
                 let url = getURL_id();
+                //console.debug({url});
                 toggleExperimental();
                 defaultCalls();
 
