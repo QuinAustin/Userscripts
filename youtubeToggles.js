@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Toggles
 // @namespace    Violentmonkey Scripts
-// @version      1.1.7
+// @version      1.1.8
 // @description  Allows hiding a variety of YouTube webpage elements
 // @author       -
 // @match        https://www.youtube.com/*
@@ -14,19 +14,19 @@
 // ==/UserScript==
 
 
-
 /*
- * for 1.1.7
-   *  Summary:
-   *    collapsible menu 
+ * For 1.1.8
+   *  Summary: can watch videos with comments on the right of video player.
    *  Fixes:
    *    none
    *  Removals:
-   *    unused functions, or replaced functions that do a similar thing
+   *    some unused code
    *  Additions:
-   *    guide sidebar is now able to have more things removed
+   *    Side Comments Toggle - this moves comments to the right side the video player. It is contained with the related content, and both are in scrollable sections. 
    *  Changes:
- * /    child buttons are now collapsible when clicking on the parent button's text
+   *    some variables were removed or changed to a const  
+*/
+
 
 
 /*
@@ -42,12 +42,7 @@ Known Issues:
 
 (function() {
     'use strict';
-    //function checkPerformance(fun) {
-    //    const startTime = performance.now()
-    //    fun();
-    //    const endTime = performance.now()
-    //    console.debug(`Call to ${fun.name} took ${endTime - startTime} milliseconds`)
-    //}
+
     function checkPerformance(o){
       const n=performance.now();
       o();
@@ -74,17 +69,6 @@ Known Issues:
       }
       return keyAsBool(keyName); //return the value of the key as a boolean
     }
-
-    function flipKey(keyName) {
-      const val = localStorage.getItem(keyName); //string "true"
-      if (val === "true") {
-        localStorage.setItem(keyName, "false");
-      }
-      else {
-        localStorage.setItem(keyName, "true");
-      }
-    }
-
 
 
 /*
@@ -148,6 +132,7 @@ Known Issues:
 *        WATCH PAGE TOGGLES
 *======================================================*/
 //Core UI
+    let showSideComments        = declareKey('ytt-show-side-comments'          , true);
     let showRecommedations      = declareKey('ytt-show-recommendations'        , true);
     let showEndScreenVideos     = declareKey('ytt-show-end-screen-videos'      , true);
     let showBelow               = declareKey('ytt-show-below'                  , true);
@@ -161,7 +146,7 @@ Known Issues:
 *        DEVELOPER TOGGLES
 *======================================================*/
 //Developer Tool Toggles
-    //let debugMode               = declareKey('ytt-debug-mode'                     , false);
+    //let debugMode             = declareKey('ytt-debug-mode'                     , false);
     let enableBetterZoom        = declareKey('ytt-enable-better-zoom'             , false);
     let enableStreamerMode      = declareKey('ytt-enable-streamer-mode'           , false);
     let showLabsFeature         = declareKey('ytt-show-labs-feature'              , false);
@@ -269,17 +254,6 @@ Known Issues:
       console.debug("Ending Toggle Check");
     }
 
-/*
-  function StopRecommendingChannelButton(video) {
-      const drc = video.querySelector("yt-list-item-view-model.ytListItemViewModelHost:nth-child(7) > div:nth-child(1) > div:nth-child(1) > button:nth-child(2)")
-      if (drc) { //don't recommend channel button
-          if (drc?.textContent === "Don't recommend channel") {
-              video.querySelector("")
-          }
-      }
-  }
-*/
-
 
   function toggleLabsFeature() {
       //This is blocking channels
@@ -329,7 +303,6 @@ Known Issues:
     function togglePrimaryHeader(){const e=document.querySelector("ytd-feed-filter-chip-bar-renderer");e&&(e.parentElement.style.display=showPrimaryHeader?"":"none",document.querySelector("#frosted-glass").style.height=showPrimaryHeader?"112px":"80px")}
     function toggleGuide(){const e=document.querySelector("#guide");e&&(e.style.display=showGuide?"":"none",setElementProperty(document.querySelector("#content"),"--ytd-persistent-guide-width",showGuide?"240":"0","px"))}
 
-
     function toggleBelow(){hideQuerySelector("#below",!showBelow)}
     function toggleRecommendations()  {
       if (!enableStreamerMode) { //disabled by streamer mode
@@ -341,7 +314,6 @@ Known Issues:
       hideQuerySelectorAll('.ytp-ce-video', !showEndScreenVideos)
     }
     function toggleComments(){hideQuerySelector("#comments",!showComments)}
-
 
     function toggleAskYouTube() {
         const askButton = document.querySelector('#center button')
@@ -361,7 +333,6 @@ Known Issues:
         if (getURL_id() === 0) {
             toggleAskYouTube();
         }
-
         else {
             const buttons = document.querySelectorAll('#flexible-item-buttons .ytSpecButtonShapeNextHost'); //Next to Save button
             const enabled = showAI ? '' : 'none';
@@ -400,23 +371,6 @@ Known Issues:
             toggleAI();
         }
     }
-
-
-    //function togglePrimaryHeader() {
-    //    const primaryHeader = document.querySelector('ytd-feed-filter-chip-bar-renderer');
-    //    if (primaryHeader) {
-    //        primaryHeader.parentElement.style.display = showPrimaryHeader ? '' : 'none';
-    //        document.querySelector('#frosted-glass').style.height = showPrimaryHeader ? '112px' : '80px';
-    //    }
-    //}
-//
-    //function toggleGuide() {
-    //    const guide = document.querySelector('#guide');
-    //    if (guide) {
-    //      guide.style.display = showGuide ? '' : 'none';
-    //      setElementProperty(document.querySelector('#content'), '--ytd-persistent-guide-width', showGuide ? '240' : '0', 'px');
-    //    }
-    //}
 
 
     function toggleBanner() {
@@ -529,11 +483,9 @@ Known Issues:
       }
     }
 
-
     function toggleShowWatched() {
         getURL_id()===0 ? processVideos() : startVideoChecks();
     }
-
 
     function convertStringToNumber(num) {
         if (num.isInteger) {
@@ -567,7 +519,6 @@ Known Issues:
         let date;
         const duration = video.querySelector(".ytBadgeShapeText")?.textContent.trim();
 
-
         if (otherMetadata.length > 1) {
             try {
                 channel = otherMetadata[0].textContent;
@@ -592,7 +543,6 @@ Known Issues:
                 console.warn({video, otherMetadata})
             }
         }
-        //old locaiton of duration -> <-
         let   progress = video.querySelector(".ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment");
         progress = progress ? progress.style.width : "0%"
         return({url, title, channel, views, date, duration, progress});
@@ -710,15 +660,11 @@ Known Issues:
     }
 
 
-
     function startItemBadgeChecks() {
-        //const container = document.getElementById('contents');
-        const container = getContents();//document.querySelector('ytd-rich-item-renderer').parentElement
+        const container = getContents();
         const url = getURL_id();
 
-        //if (url === 0) {
         let videoSelector = "ytd-rich-item-renderer";
-        //}
         if (url === 1) {
           videoSelector = 'yt-lockup-view-model';
         }
@@ -726,7 +672,7 @@ Known Issues:
             container.querySelectorAll(videoSelector).forEach(query => {
                 const badgeTextAll  = query.querySelectorAll('.ytBadgeShapeText');
                 const badgeIcon     = query.querySelector('.ytBadgeShapeIcon'); //this badge appears to the left of the duration
-                const badgeRenderer = query.querySelector('ytd-badge-supported-renderer p'); //@Deprecated
+                //const badgeRenderer = query.querySelector('ytd-badge-supported-renderer p'); //@Deprecated
                 let iconPathStart = "xx";
 
                 if (badgeIcon !== null) {
@@ -734,17 +680,6 @@ Known Issues:
                         iconPathStart = badgeIcon.querySelector('path').getAttribute('d').substring(0,2);
                     } catch(e){}
                 }
-
-               //if (false) { //debugMode) {
-               //    console.info('badgeTextAll: ', {badgeTextAll});
-               //    console.info('badgeTextAll[0]: ', badgeTextAll[0]?.textContent.trim().toLowerCase());
-               //    console.info('badgeTextAll[1]: ', badgeTextAll[1]?.textContent.trim().toLowerCase());
-               //    console.info('badgeTextAll[2]: ', badgeTextAll[2]?.textContent.trim().toLowerCase());
-               //    console.info('badgeTextAll[3]: ', badgeTextAll[3]?.textContent.trim().toLowerCase());
-               //
-               //    console.info('badgeIcon: ', badgeIcon);
-               //    console.info('badgeRenderer: ', badgeRenderer);
-               //}
 
 
                 const checkBadge = (text) => {
@@ -792,7 +727,6 @@ Known Issues:
                   }
                 }
 
-
                 switch (iconPathStart) { //note: M5.5 1.383V6.88a2.25 2.25 0 101 1.871V4.6l2.743 1.647a.5.5 0 00.757-.43V3.485a.5.5 0 00-.243-.429l-3.5-2.1a.5.5 0 00-.757.427Z
                     case ('M5'):
                         query.style.display = showMusic ? '' : 'none';
@@ -809,13 +743,9 @@ Known Issues:
 
   /*
    *
-   *
    * toggle createButton //this one makes sense, because most people will never use this
    * toggle MerchStore //People complain about this showing up
    * the rest can probably stay for now under the streamerMode
-   *
-   *
-   *
    *
   */
 
@@ -827,7 +757,6 @@ Known Issues:
           hideQuerySelector('#country-code', !showCountryCode);
       }
     }
-
     function toggleCreateButton() {
       if (!enableStreamerMode) {
           toggleQuerySelectorChild('#end #buttons', 0, !showCreateButton);
@@ -847,7 +776,6 @@ Known Issues:
       if (!enableStreamerMode) {
           document.querySelector('#end #buttons').hidden = !showEndButtons;
       }
-
     }
 
 
@@ -860,7 +788,6 @@ Known Issues:
         }
     }
     function toggleYouSection() {
-
         document.querySelectorAll('ytd-guide-section-renderer')[2].hidden = !showYouSection;
     }
     function toggleExploreSection() {
@@ -877,10 +804,6 @@ Known Issues:
     }
 
 
-
-
-
-
     function checkGuideSection() {
         toggleGuide();
         toggleShortsButton();
@@ -891,12 +814,6 @@ Known Issues:
         toggleReportHistoryButton();
         toggleFooterSection();
     }
-
-
-
-
-
-
 
 
 
@@ -930,31 +847,26 @@ Known Issues:
 
 
     function setItemsPerRow(number) {
-                const container = document.querySelector('ytd-rich-grid-renderer');
-                if (container) {
-                    container.style.setProperty('--ytd-rich-grid-items-per-row', (number));
-                }
+        const container = document.querySelector('ytd-rich-grid-renderer');
+        if (container) {
+            container.style.setProperty('--ytd-rich-grid-items-per-row', (number));
+        }
 
-                //shelfs seem to make their own properties, or they have a different parent that was not found, so each shelf is checked
-                const container2 = document.querySelectorAll('ytd-rich-shelf-renderer');
-                if (container2) {
-                    container2.forEach(query => {
-                        query.style.setProperty('--ytd-rich-grid-items-per-row', (number));
-                        //console.debug(query.style.getPropertyValue('--ytd-rich-grid-items-per-row'));
-                    });
-                }
-
-
-
-                //document.documentElement.style.fontSize = (10 + difference*2) + "px";
+        //shelfs have their own properties, so each shelf is checked
+        const container2 = document.querySelectorAll('ytd-rich-shelf-renderer');
+        if (container2) {
+            container2.forEach(query => {
+                query.style.setProperty('--ytd-rich-grid-items-per-row', (number));
+                //console.debug(query.style.getPropertyValue('--ytd-rich-grid-items-per-row'));
+            });
+        }
     }
 
     function resetItemsPerRow() {
         const container = document.querySelector('ytd-rich-grid-renderer');
         if (container) {
-            container.style.setProperty('--ytd-rich-grid-items-per-row', container.elementsPerRow); //elementsPerRow is a YouTube specific attribute
+            container.style.setProperty('--ytd-rich-grid-items-per-row', container.elementsPerRow);
             console.debug("elements per row: ", container.elementsPerRow)
-            //container.style.setProperty('--ytd-rich-grid-items-per-row', '');
         }
         const container2 = document.querySelectorAll('ytd-rich-shelf-renderer');
         if (container2) {
@@ -966,10 +878,9 @@ Known Issues:
         }
     }
 
+
     function toggleExperimental() {
-        //console.debug("experimental toggle flipped", enableExperimental);
         const value = localStorage.getItem('ytt-experimental-value');
-        //console.debug("experimental value: ", value);
         if (enableExperimental) {
             setItemsPerRow(value);
         }
@@ -980,25 +891,9 @@ Known Issues:
 
 
 
-
-
-    /*Streamer mode disables the following toggles from working
-     *
-     * toggleMerchStore
-     * toggleRecommendations
-     *
-     *
-     *
-    */
-
-
-
     function toggleStreamerMode() {
         const enabled = enableStreamerMode ? 'none' : '';
             try {
-
-
-
                 //Top Priority | The page loading is enough to see it
                 enabled?toggleGetElementById('country-code', enabled):toggleCountryCode();                           //toggle users country abbreviation on the top left YouTube logo | reveals location of user
                 enabled?toggleQuerySelector('#end #buttons', enabled):toggleEndButtons();                            //toggle user profile picture (as well as create button and notifications) | profile picture is the only reason for such a high priority
@@ -1098,8 +993,6 @@ Known Issues:
         document.documentElement.style.fontSize = (10) + "px";
     }
 
-
-
     function toggleBetterZoom() {
       getURL_id()===0&&enableBetterZoom?homepageZoomOn():homepageZoomOff();
     }
@@ -1109,7 +1002,6 @@ Known Issues:
             homepageZoomOn();
         }
     }
-
 
     function setMenuEl(menu) {
         globalThis.menuEl = menu;
@@ -1137,21 +1029,20 @@ Known Issues:
 
     function updateMenu() {
         try {
+            console.log("menu resized");
             const button = getMenuButtonEl();
             const menu = getMenuEl();
             const rect = button.getBoundingClientRect();
             menu.style.top = rect.bottom + 0 + 'px';
             menu.style.left = rect.left + 'px';
             menu.style.borderRadius = '10px'; //curves get removed when cutoff from window size
-
         } catch {}
     }
 
 
-
     function createMenu() {
         const menuContainer = document.createElement('div');
-        menuContainer.style.position        = 'fixed';    //stays on screen (messes up when zooming in and out)
+        menuContainer.style.position        = 'fixed'; //stays on screen (messes up when zooming in and out)
         menuContainer.style.backgroundColor = '#282828';
         menuContainer.style.color           = '#f1f1f1';
         menuContainer.style.padding         = '10px';
@@ -1165,7 +1056,6 @@ Known Issues:
         menuContainer.style.maxWidth        = '30%';
         menuContainer.style.maxHeight       = '50%';
         menuContainer.style.clipPath        = 'inset(0px round 10px)';
-        //menuContainer.style.resize = 'both'; //does not work
         return menuContainer;
     }
 
@@ -1175,11 +1065,11 @@ Known Issues:
 
 
     function createBaseToggleButton(toggleName) {
-        let toggle = document.createElement(toggleName);
+        const toggle = document.createElement(toggleName);
         toggle.id="options"
         toggle.className="style-scope ytd-settings-options-renderer"
-        toggle.style.marginLeft = '5px'; //was 25px
-        let ytd_settings_switch_renderer = document.createElement('ytd-settings-switch-renderer');
+        toggle.style.marginLeft = '5px';
+        const ytd_settings_switch_renderer = document.createElement('ytd-settings-switch-renderer');
         ytd_settings_switch_renderer.className = "style-scope ytd-settings-options-renderer";
         ytd_settings_switch_renderer.style.margin = '0px';
         toggle.appendChild(ytd_settings_switch_renderer);
@@ -1192,40 +1082,32 @@ Known Issues:
         toggleButton.checked = localStorage.getItem(key) === "true";
 
         toggleButton.addEventListener('change', (e) => {
-            //e.stopPropagation();
-            //e.preventDefault();
             localStorage.setItem(key, toggleButton.checked);
             onChange();
         });
 
         const textEls = toggle.querySelectorAll('yt-formatted-string');
         const titleEl = textEls[0];
-        //const subtitleEl = textEls[2];
-
         toggle.querySelector('yt-img-shadow').remove();
-
+        
         titleEl.parentElement.style.display = 'ruby';
         titleEl.removeAttribute('is-empty');
         titleEl.textContent = text;
-
-        //subtitleEl.removeAttribute('is-empty');
-        //subtitleEl.textContent = subtitle;
-
         titleEl.title = tooltip;
     }
 
     function addToggle(menu, toggleName, key, onChange, text, tooltip) {
-        let button = createBaseToggleButton(toggleName);
+        const button = createBaseToggleButton(toggleName);
         menu.append(button);
         createInitialzedToggleButton(toggleName, key, onChange, text, tooltip);
     }
 
     function createBaseToggleButtonChild(toggleName) {
-        let childToggle = document.createElement(toggleName);
+        const childToggle = document.createElement(toggleName);
             childToggle.id="options"
             childToggle.className="style-scope ytd-settings-options-renderer"
             childToggle.style.marginLeft = '20px'; //was 25px
-        let ytd_settings_switch_renderer = document.createElement('ytd-settings-switch-renderer');
+        const ytd_settings_switch_renderer = document.createElement('ytd-settings-switch-renderer');
             ytd_settings_switch_renderer.className = "style-scope ytd-settings-options-renderer";
             ytd_settings_switch_renderer.style.margin = '0px';
 
@@ -1234,7 +1116,6 @@ Known Issues:
     }
 
     function addToggleChild(parentToggleName, menu, toggleName, key, onChange, text, tooltip) {
-
         let childButton = createBaseToggleButtonChild(toggleName);
         menu.append(childButton);
 
@@ -1242,26 +1123,22 @@ Known Issues:
 
         if (parentButton.childElementCount == 1) { //Creates a container for child toggles to be stored
             let parentText = parentButton.querySelectorAll('yt-formatted-string')[0].textContent
-
-
             let childSection = document.createElement("ytt-"+parentToggleName+"-child-section")
+
             parentButton.appendChild(childSection);
             parentButton.querySelectorAll('#title')[0].textContent = '▼ '+parentText;
             childSection.hidden = 'true';
 
             parentButton.querySelector('yt-formatted-string').addEventListener('click', (e) => {
-                console.debug(e.target, e.currentTarget);
                 if( e.target !== e.currentTarget ) {
                     return;
                 }
                 childSection.hidden = !childSection.hidden;
-                let direction = childSection.hidden ?  '▼ ' : '▲ ' ;//' ˅' : ' ˄';
+                let direction = childSection.hidden ? '▼ ':'▲ ';
                 parentButton.querySelectorAll('#title')[0].textContent = direction+parentText;
-
             });
         }
         parentButton.childNodes[1].appendChild(childButton);
-
         createInitialzedToggleButton(toggleName, key, onChange, text, tooltip);
     }
 
@@ -1279,12 +1156,11 @@ Known Issues:
         label.style.fontWeight = 'bold';
         wrapper.appendChild(label);
         menu.append(wrapper);
-        //return wrapper;
     }
 
     function addToggleField(toggleName, key, onChange, min, max, dv, type, id, tooltip) {
-        let toggleButton = document.querySelector(toggleName).querySelector('#title');
-        let input = document.createElement("input");
+        const toggleButton = document.querySelector(toggleName).querySelector('#title');
+        const input = document.createElement("input");
         input.style.marginLeft = "10px";
         input.type = type;
         input.id   = id;
@@ -1305,6 +1181,8 @@ Known Issues:
 
 //======================================================================================================
     function BuildMenuContainer(menuContainer) {
+        BuildCommentContainer(); //Move this to an earlier point in execution
+
         document.body.appendChild(menuContainer);
         /*======================================================
         *        GLOBAL TOGGLES
@@ -1332,7 +1210,6 @@ Known Issues:
                 addToggleChild('showGuide', menuContainer, 'showReportHistory',       'ytt-show-report-history-button', () => { showReportHistoryButton  = !showReportHistoryButton;  toggleReportHistoryButton();  }, "Report History",    "Button In Guide");
                 addToggleChild('showGuide', menuContainer, 'showFooterSection',       'ytt-show-Footer-Section',        () => { showFooterSection        = !showFooterSection;        toggleFooterSection();        }, "Footer",            "Section In Guide");
 
-
         addToggleLabel(menuContainer, "Blocks of Content", '10px');
              addToggle(menuContainer, 'showBanners',           'ytt-show-banners',              () => { showBanner            = !showBanner            ;startShelfChecks(); }, "Banners",             "Turns on Banners");
              addToggle(menuContainer, 'showShorts',            'ytt-show-shorts',               () => { showShorts            = !showShorts            ;startShelfChecks(); }, "Shorts",              "Homepage Shorts");
@@ -1355,12 +1232,12 @@ Known Issues:
              addToggle(menuContainer, 'showLivestreams',          'ytt-show-livestreams', () => { showLivestreams = !showLivestreams;   startItemBadgeChecks(); }, "Livestreams",      "Turns on Livestreams");
              addToggle(menuContainer, 'showStreamed',             'ytt-show-streamed',    () => { showStreamed    = !showStreamed;      startVideoChecks();     }, "Past Livestreams", "Turns on Past Livestreams (streamed)");
                        addToggleField('showStreamed',             'ytt-streamed-value',   () => { startVideoChecks()}, 0, 1e12, 1e12, "number", "ytt-streamed-id", "Views (Less Than Equal Gets Hidden)");
-            //_inputField('ShowStreamed'          ,'ytt-streamed-value', 1e12, "number", "ytt-streamed-id");
       /*======================================================
        *        WATCH PAGE TOGGLES
        *======================================================*/
         addToggleLabel(menuContainer, "Watchpage Toggles", '15px');
         addToggleLabel(menuContainer, "Core UI");
+             addToggle(menuContainer,                             'showSideComments',    'ytt-show-side-comments',     () => { showSideComments    = !showSideComments;    toggleSideComments();    }, "Side Comments",     "Moves comments to the right side of video player");
              addToggle(menuContainer,                             'showRecommendations', 'ytt-show-recommendations',   () => { showRecommedations  = !showRecommedations;  toggleRecommendations(); }, "Recommendations",   "Recommendation section on video watchpages");
              addToggle(menuContainer,                             'showEndScreenVideos', 'ytt-show-end-screen-videos', () => { showEndScreenVideos = !showEndScreenVideos; toggleEndScreenVideos(); }, "End Screen Videos", "Videos recommended when a video ends");
              addToggle(menuContainer,                             'showBelow',           'ytt-show-below',             () => { showBelow           = !showBelow;           toggleBelow();           }, "Below Player",      "Everything below the video's player");
@@ -1382,6 +1259,84 @@ Known Issues:
                       addToggleField('enableExperimental', 'ytt-experimental-value',   () => { toggleExperimental()}, 0, 1e6, -1, "number", "ytt-experiemental-id", "Videos (Per Row On Homepage)");
     }
 
+    function updateCommentMenu() {
+        try {
+            console.log("resizing side comments");
+            const split = document.querySelector('#ytt-split-container');
+            const player = document.querySelector('#player');
+            split.style.height = player.getBoundingClientRect().height + "px";
+            const sidebar = document.querySelector('#secondary');
+            split.style.width = sidebar.getBoundingClientRect().width + "px";
+        } catch{}
+    }
+    function toggleSideComments() {
+        const commentSection = document.querySelector("#comments");
+        const secondary = document.querySelector("#secondary");
+        const relatedSection = secondary.querySelector('#related');
+        const yttContainer = document.querySelector('#ytt-container');
+        if (showSideComments) {
+            const commentMenu = document.querySelector('#ytt-comment-menu');
+            const relatedMenu = document.querySelector('#ytt-related-menu'); 
+            commentMenu.appendChild(commentSection);
+            relatedMenu.appendChild(relatedSection);
+            secondary.appendChild(yttContainer);
+            yttContainer.hidden = false;
+        }
+        else {
+            secondary.append(relatedSection);
+            const below = document.querySelector("#below");
+            below.append(commentSection);
+            yttContainer.hidden = true;
+        }
+    }
+
+
+    function BuildCommentContainer() {
+        const createMenuContainer = () => {
+            let menuContainer = document.createElement('div');
+            menuContainer.style.overflow  = 'scroll';
+            menuContainer.style.maxHeight = '50%';
+            menuContainer.style.border    = "1px solid black";
+            menuContainer.style.padding   = "10px";
+            return menuContainer;
+        }
+        const commentMenu = createMenuContainer();
+        const relatedMenu = createMenuContainer();
+        commentMenu.id = "ytt-comment-menu";
+        relatedMenu.id = 'ytt-related-menu';
+
+        
+        
+        const split = document.createElement("container");
+        const player = document.querySelector('#player');
+        const sidebar = document.querySelector('#secondary');
+        
+        split.id = "ytt-split-container";
+        split.style.height = player.getBoundingClientRect().height + "px";
+        split.style.width = sidebar.getBoundingClientRect().width + "px";
+        split.appendChild(commentMenu);
+        split.appendChild(relatedMenu);
+
+        let yttContainer = document.createElement("ytt-container");
+        yttContainer.id = "ytt-container";
+        yttContainer.style.display = "grid";
+        yttContainer.style.gridTemplateColumns = "auto auto auto";
+        yttContainer.style.padding         = "10px";
+        yttContainer.hidden = true;
+        yttContainer.appendChild(split);
+        
+        document.body.appendChild(yttContainer);
+        toggleSideComments();
+    }
+
+
+
+    function updateElements() {
+        updateMenu();
+        if (getURL_id() == 1 && showSideComments) { //only run on watchpage
+            updateCommentMenu();
+        }
+    }
 
     function createMenuButton() {
         const voiceSearchButton = document.querySelector('#voice-search-button');
@@ -1435,7 +1390,9 @@ Known Issues:
 
         setMenuButtonEl(yttButton);
         setMenuEl(menu);
-        window.onresize = updateMenu;
+        //window.onresize = updateMenu;
+        window.onresize = updateElements;
+
 
         yttButton.onclick = function() {
           toggleMenu();
