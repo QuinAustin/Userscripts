@@ -13,18 +13,23 @@
 //
 // ==/UserScript==
 
-
 /*
- * For 1.1.8
-   *  Summary: can watch videos with comments on the right of video player.
+ * For 1.1.9
+   *  Summary: comments can be put above related in vertical mode
    *  Fixes:
-   *    none
+   *    getContents() now works in vertical mode for watchpage
    *  Removals:
-   *    some unused code
+   *    observerQuery replaced tryCloneObserver function, as it is a better generic functino  
    *  Additions:
-   *    Side Comments Toggle - this moves comments to the right side the video player. It is contained with the related content, and both are in scrollable sections. 
+   *    None
    *  Changes:
-   *    some variables were removed or changed to a const  
+   *    'Side Comments' changed to 'Split Content', to reflect it's use in the vertical orientation mode as well
+   *  TODO: 
+   *    replace majority of updateCommentMenu with updateSplit. 
+   *    remove more getURL_ID() with url_id
+   *    check getContents() on homepage in vertical mode
+   *    
+   *    
 */
 
 
@@ -42,6 +47,62 @@ Known Issues:
 
 (function() {
     'use strict';
+
+
+
+    function getURL_id() {
+        //console.warn("@deprecated getURL_id() was replaced with `url_id`");
+        const url = document.URL;
+        //console.info("current url: ",url);
+        if (url === "https://www.youtube.com/" || url === "https://www.youtube.com/?bp=wgUCEAE%3D") { //Homepage || Event Homepage
+            return 0;
+        }
+        else if (url.startsWith("https://www.youtube.com/watch?v=")) { //Video Link
+            return 1;
+        }
+        else if (url.startsWith("https://www.youtube.com/results?search_query=")) { //Search Page
+            return 2;
+        }
+        else if (url.startsWith("https://www.youtube.com/@") || url.startsWith("https://www.youtube.com/channel/")) {  //A Channel Page || A Collab Video Link that has redirected to a Channel Page
+          return 3;
+        }
+        return false;
+    }
+
+    function elementExists(element) {
+        console.debug("checking for: ", element);
+        return document.querySelector(element) ? true : false
+    }
+
+
+
+    let url_id = getURL_id();
+    navigation.addEventListener("navigate", e => {
+        const url = e.destination.url;
+        console.debug("url: ",url);
+
+        if (url === "https://www.youtube.com/" || url === "https://www.youtube.com/?bp=wgUCEAE%3D") { //Homepage || Event Homepage
+            url_id = 0;
+        }
+        else if (url.startsWith("https://www.youtube.com/watch?v=")) { //Video Link
+            url_id = 1;
+            if (!(document.querySelector("#ytt-container"))) {
+                observeQuery(document.body, containerElementsExist, BuildCommentContainer);
+            }
+
+        }
+        else if (url.startsWith("https://www.youtube.com/results?search_query=")) { //Search Page
+            url_id = 2;
+        }
+        else if (url.startsWith("https://www.youtube.com/@") || url.startsWith("https://www.youtube.com/channel/")) {  //A Channel Page || A Collab Video Link that has redirected to a Channel Page
+            url_id = 3;
+        }
+        console.debug("url_id: ",url_id);
+    });
+
+
+
+
 
     function checkPerformance(o){
       const n=performance.now();
@@ -132,7 +193,7 @@ Known Issues:
 *        WATCH PAGE TOGGLES
 *======================================================*/
 //Core UI
-    let showSideComments        = declareKey('ytt-show-side-comments'          , true);
+    let showContentSplit        = declareKey('ytt-show-content-split'          , false);
     let showRecommedations      = declareKey('ytt-show-recommendations'        , true);
     let showEndScreenVideos     = declareKey('ytt-show-end-screen-videos'      , true);
     let showBelow               = declareKey('ytt-show-below'                  , true);
@@ -166,28 +227,28 @@ Known Issues:
     function hideQuerySelector(e,t){const o=document.querySelector(e);o&&(o.hidden=t)} //checks if element exists before hiding it
 
 
-  //if child 0 is hidden and child 1 is not, child 1 will become child 0. use style.display = '':'none'
+    //if child 0 is hidden and child 1 is not, child 1 will become child 0. use style.display = '':'none'
 
-  //function hideQuerySelectorChild(e,n,t){const o=document.querySelector(e);if(o){const e=o.children[n];e&&(e.hidden=n)}}
-   // function hideQuerySelectorChild(element, number, toggle) {
-   //   const selector = document.querySelector(element);
-   //   if (selector) {
-   //       const child = selector.children[number]
-   //       if (child) {
-   //         child.hidden = toggle;
-   //       }
-   //   }
-   // }
+    //function hideQuerySelectorChild(e,n,t){const o=document.querySelector(e);if(o){const e=o.children[n];e&&(e.hidden=n)}}
+    // function hideQuerySelectorChild(element, number, toggle) {
+    //   const selector = document.querySelector(element);
+    //   if (selector) {
+    //       const child = selector.children[number]
+    //       if (child) {
+    //         child.hidden = toggle;
+    //       }
+    //   }
+    // }
 
-  function toggleQuerySelectorChild(e,n,t) {
-    const selector = document.querySelector(e);
-    if (selector) {
-      const child = selector.children[n];
-      if (child) {
-        child.style.display = t ? 'none' : '';
-      }
+    function toggleQuerySelectorChild(e,n,t) {
+        const selector = document.querySelector(e);
+        if (selector) {
+        const child = selector.children[n];
+        if (child) {
+            child.style.display = t ? 'none' : '';
+        }
+        }
     }
-  }
 
     function hideQuerySelectorAll(element,toggle) {
       document.querySelectorAll(element).forEach(query => {
@@ -218,23 +279,7 @@ Known Issues:
         ele.style.setProperty(property, ( propertyValue + propertyType ));
     }
 
-    function getURL_id() {
-        const url = document.URL;
-        //console.info("current url: ",url);
-        if (url === "https://www.youtube.com/" || url === "https://www.youtube.com/?bp=wgUCEAE%3D") { //Homepage || Event Homepage
-            return 0;
-        }
-        else if (url.startsWith("https://www.youtube.com/watch?v=")) { //Video Link
-            return 1;
-        }
-        else if (url.startsWith("https://www.youtube.com/results?search_query=")) { //Search Page
-            return 2;
-        }
-        else if (url.startsWith("https://www.youtube.com/@") || url.startsWith("https://www.youtube.com/channel/")) {  //A Channel Page || A Collab Video Link that has redirected to a Channel Page
-          return 3;
-        }
-        return false;
-    }
+
 
 
     /*
@@ -273,14 +318,14 @@ Known Issues:
 
 
     function getContents() { //To solve issues pertaining to redirects
+        let url = url_id;//getURL_id();
         try {
-            let url = getURL_id();
             switch (url) {
               case 0: //Homepage
                 return document.querySelector('ytd-rich-item-renderer').parentElement;
               break;
               case 1: //Watchpage
-                return document.querySelector('#secondary yt-lockup-view-model').parentElement;
+                return document.querySelector("#contents yt-lockup-view-model").parentElement
                 //return document.querySelector('yt-lockup-view-model').parentElement;
               break;
               default:
@@ -288,7 +333,7 @@ Known Issues:
               break;
             }
         } catch(e) {
-            console.warn("Failed to getURL_id()")
+            console.warn("Failed to getContents()")
             setTimeout(getContents, 50)
         }
     }
@@ -301,7 +346,25 @@ Known Issues:
 
 
     function togglePrimaryHeader(){const e=document.querySelector("ytd-feed-filter-chip-bar-renderer");e&&(e.parentElement.style.display=showPrimaryHeader?"":"none",document.querySelector("#frosted-glass").style.height=showPrimaryHeader?"112px":"80px")}
-    function toggleGuide(){const e=document.querySelector("#guide");e&&(e.style.display=showGuide?"":"none",setElementProperty(document.querySelector("#content"),"--ytd-persistent-guide-width",showGuide?"240":"0","px"))}
+    //function toggleGuide(){const e=document.querySelector("#guide");e&&(e.style.display=showGuide?"":"none",setElementProperty(document.querySelector("#content"),"--ytd-persistent-guide-width",showGuide?"240":"0","px"))}
+    function toggleGuide(){
+        const guide=document.querySelector("#guide");
+        const miniGuide = document.querySelector('ytd-mini-guide-renderer');
+        const guideButton = document.querySelector("#guide-button");
+        if (guide) {
+            guide.hidden = !showGuide;
+            document.querySelector("#content").style.setProperty("--ytd-persistent-guide-width", (showGuide?"240":"0") + "px");
+        }
+        if (miniGuide) {
+            miniGuide.hidden = !showGuide;
+        }
+        if (guideButton) {
+            guideButton.hidden = !showGuide;
+        }
+
+    }
+
+
 
     function toggleBelow(){hideQuerySelector("#below",!showBelow)}
     function toggleRecommendations()  {
@@ -330,10 +393,8 @@ Known Issues:
 
 
     function toggleAI() {
-        if (getURL_id() === 0) {
-            toggleAskYouTube();
-        }
-        else {
+        toggleAskYouTube();
+        if (url_id == 1) { 
             const buttons = document.querySelectorAll('#flexible-item-buttons .ytSpecButtonShapeNextHost'); //Next to Save button
             const enabled = showAI ? '' : 'none';
             buttons.forEach(query => {
@@ -540,7 +601,7 @@ Known Issues:
                 }
             }
             catch { //can occasionally fail to filter.
-                console.warn({video, otherMetadata})
+                //console.warn({video, otherMetadata})
             }
         }
         let   progress = video.querySelector(".ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment");
@@ -749,33 +810,30 @@ Known Issues:
    *
   */
 
-
-
-
     function toggleCountryCode() {
-      if (!enableStreamerMode) {
-          hideQuerySelector('#country-code', !showCountryCode);
-      }
+        if (!enableStreamerMode) {
+            hideQuerySelector('#country-code', !showCountryCode);
+        }
     }
     function toggleCreateButton() {
-      if (!enableStreamerMode) {
-          toggleQuerySelectorChild('#end #buttons', 0, !showCreateButton);
-      }
+        if (!enableStreamerMode) {
+            toggleQuerySelectorChild('#end #buttons', 0, !showCreateButton);
+        }
     }
     function toggleNotificationButton() {
-      if (!enableStreamerMode) {
-          toggleQuerySelectorChild('#end #buttons', 1, !showNotifications);
-      }
+        if (!enableStreamerMode) {
+            toggleQuerySelectorChild('#end #buttons', 1, !showNotifications);
+        }
     }
     function togglePFP() {
-      if (!enableStreamerMode) {
-          toggleQuerySelectorChild('#end #buttons', 2, !showPfp);
-      }
+        if (!enableStreamerMode) {
+            toggleQuerySelectorChild('#end #buttons', 2, !showPfp);
+        }
     }
     function toggleEndButtons() {
-      if (!enableStreamerMode) {
-          document.querySelector('#end #buttons').hidden = !showEndButtons;
-      }
+        if (!enableStreamerMode) {
+            document.querySelector('#end #buttons').hidden = !showEndButtons;
+        }
     }
 
 
@@ -806,13 +864,17 @@ Known Issues:
 
     function checkGuideSection() {
         toggleGuide();
-        toggleShortsButton();
-        toggleSubscriptionsSection();
-        toggleYouSection();
-        toggleExploreSection();
-        toggleFromYouTubeSection();
-        toggleReportHistoryButton();
-        toggleFooterSection();
+        try {
+            toggleShortsButton();
+            toggleSubscriptionsSection();
+            toggleYouSection();
+            toggleExploreSection();
+            toggleFromYouTubeSection();
+            toggleReportHistoryButton();
+            toggleFooterSection();
+        } catch {
+            console.warn("guide contents could not be found");
+        }
     }
 
 
@@ -832,17 +894,14 @@ Known Issues:
             hideQuerySelector('ytd-comment-simplebox-renderer', !showCommentingField);
         }
     }
-    function toggleReplyButton() { //NO TOGGLE EXISTS FOR THIS YET
-        if (!enableStreamerMode) {
+
+    function toggleReplyButton() {
+        if (!enableStreamerMode) {  //disabled by streamer mode
             //document.querySelector('#reply-button-end').hidden = false;//!showReplyButton;
             hideQuerySelectorAll('#reply-button-end', !showReplyButton);
         }
 
     }
-
-
-
-
 
 
 
@@ -891,69 +950,59 @@ Known Issues:
 
 
 
+    //2026-09-20 - This feels like it was over complicated, why is enabled not just make enabled a bool, and use it to element.hidden = enabled. Or even better element.hidden = true, as an if (enableStreamerMode) { .... } would solve everything, and not need a variable
     function toggleStreamerMode() {
         const enabled = enableStreamerMode ? 'none' : '';
-            try {
-                //Top Priority | The page loading is enough to see it
-                enabled?toggleGetElementById('country-code', enabled):toggleCountryCode();                           //toggle users country abbreviation on the top left YouTube logo | reveals location of user
-                enabled?toggleQuerySelector('#end #buttons', enabled):toggleEndButtons();                            //toggle user profile picture (as well as create button and notifications) | profile picture is the only reason for such a high priority
-                enabled||(toggleCreateButton(),toggleNotificationButton(),togglePFP());
+        try {
+            //Top Priority | The page loading is enough to see it
+            enabled?toggleGetElementById('country-code', enabled):toggleCountryCode();                           //toggle users country abbreviation on the top left YouTube logo | reveals location of user
+            enabled?toggleQuerySelector('#end #buttons', enabled):toggleEndButtons();                            //toggle user profile picture (as well as create button and notifications) | profile picture is the only reason for such a high priority
+            enabled||(toggleCreateButton(),toggleNotificationButton(),togglePFP());
+            enabled?toggleQuerySelector('ytd-guide-section-renderer:nth-child(2)', enabled):toggleGuide(); //toggle subscriptions on the left side menu on the homepage | Subscriptions can reveal channels that are either local to where a user lives, or talk about personal topics and beliefs
 
 
-                enabled?toggleQuerySelector('ytd-guide-section-renderer:nth-child(2)', enabled):toggleGuide(); //toggle subscriptions on the left side menu on the homepage | Subscriptions can reveal channels that are either local to where a user lives, or talk about personal topics and beliefs
-
-
-
-                //Medium Priority | User has to give input (scrolling) to see it
-
-
-
-                if (getURL_id() === 1) { //WATCHPAGE ONLY
-                    //MERCH STORE
-                    //enabled?document.querySelector('ytd-merch-shelf-renderer').hidden=enabled:toggleMerchStore();
-                    enabled?hideQuerySelectorAll('ytd-merch-shelf-renderer', enabled):toggleMerchStore(); //at least two different store elements
-
-
-
-
-                    //RECOMMENDATIONS
-                    //enabled?document.querySelector('#related').hidden=enabled:toggleRecommendations();
-                    enabled?hideQuerySelector('#related', enabled):toggleRecommendations();
-                    //COMMENTING
-                    //enabled?document.querySelector('ytd-comment-simplebox-renderer').hidden=enabled:toggleCommentingField(); //toggleQuerySelector('ytd-comment-simplebox-renderer', enabled);          //toggle Commenting Under Videos | reveals profile picture, and name if something is submitted
-                    enabled?hideQuerySelector('ytd-comment-simplebox-renderer', enabled):toggleCommentingField();
-                    //REPLY BUTTON
-                    enabled?hideQuerySelector('#reply-button-end', enabled):toggleReplyButton();
-                    //toggleQuerySelectorAll('#reply-button-end', enabled);                    //remove reply button in comments | reveals profile picture, and name if something is submitted
-                }
-
-
-                //Low Priority | User has to hover or click something outside of common areas to see it
-
-
-                //remove items from the left side bar
-                document.querySelectorAll('ytd-mini-guide-entry-renderer.style-scope .yt-simple-endpoint').forEach(query => {
-                    const title = query.title;
-                    switch (title) {
-                        case 'Home':
-                            //do nothing for now
-                        break;
-                        case 'Shorts':
-                            //do nothing for now
-                        break;
-                        case 'Subscriptions':
-                            query.style.display = enabled ? 'none' : '';
-                        break;
-                        case 'You':
-                            query.style.display = enabled ? 'none' : '';
-                        break;
-                    }
-                });
-              const container = getContents()
-            } catch (e) {
-                console.debug(e);
-                setTimeout("streamer mode failed...retrying",toggleStreamerMode, 50);
+            //Medium Priority | User has to give input (scrolling) to see it
+            if (getURL_id() === 1) { //WATCHPAGE ONLY
+                //MERCH STORE
+                //enabled?document.querySelector('ytd-merch-shelf-renderer').hidden=enabled:toggleMerchStore();
+                enabled?hideQuerySelectorAll('ytd-merch-shelf-renderer', enabled):toggleMerchStore(); //at least two different store elements
+                //RECOMMENDATIONS
+                //enabled?document.querySelector('#related').hidden=enabled:toggleRecommendations();
+                enabled?hideQuerySelector('#related', enabled):toggleRecommendations();
+                //COMMENTING
+                //enabled?document.querySelector('ytd-comment-simplebox-renderer').hidden=enabled:toggleCommentingField(); //toggleQuerySelector('ytd-comment-simplebox-renderer', enabled);          //toggle Commenting Under Videos | reveals profile picture, and name if something is submitted
+                enabled?hideQuerySelector('ytd-comment-simplebox-renderer', enabled):toggleCommentingField();
+                //REPLY BUTTON
+                enabled?hideQuerySelector('#reply-button-end', enabled):toggleReplyButton();
+                //toggleQuerySelectorAll('#reply-button-end', enabled);                    //remove reply button in comments | reveals profile picture, and name if something is submitted
             }
+
+
+            //Low Priority | User has to hover or click something outside of common areas to see it
+
+            //remove items from the left side bar
+            document.querySelectorAll('ytd-mini-guide-entry-renderer.style-scope .yt-simple-endpoint').forEach(query => {
+                const title = query.title;
+                switch (title) {
+                    case 'Home':
+                        //do nothing for now
+                    break;
+                    case 'Shorts':
+                        //do nothing for now
+                    break;
+                    case 'Subscriptions':
+                        query.style.display = enabled ? 'none' : '';
+                    break;
+                    case 'You':
+                        query.style.display = enabled ? 'none' : '';
+                    break;
+                }
+            });
+            const container = getContents()
+        } catch (e) {
+            console.debug(e);
+            setTimeout("streamer mode failed...retrying",toggleStreamerMode, 50);
+        }
     }
 
 
@@ -1064,6 +1113,7 @@ Known Issues:
   //======================================================================================================
 
 
+
     function createBaseToggleButton(toggleName) {
         const toggle = document.createElement(toggleName);
         toggle.id="options"
@@ -1089,7 +1139,7 @@ Known Issues:
         const textEls = toggle.querySelectorAll('yt-formatted-string');
         const titleEl = textEls[0];
         toggle.querySelector('yt-img-shadow').remove();
-        
+
         titleEl.parentElement.style.display = 'ruby';
         titleEl.removeAttribute('is-empty');
         titleEl.textContent = text;
@@ -1181,8 +1231,6 @@ Known Issues:
 
 //======================================================================================================
     function BuildMenuContainer(menuContainer) {
-        BuildCommentContainer(); //Move this to an earlier point in execution
-
         document.body.appendChild(menuContainer);
         /*======================================================
         *        GLOBAL TOGGLES
@@ -1237,7 +1285,7 @@ Known Issues:
        *======================================================*/
         addToggleLabel(menuContainer, "Watchpage Toggles", '15px');
         addToggleLabel(menuContainer, "Core UI");
-             addToggle(menuContainer,                             'showSideComments',    'ytt-show-side-comments',     () => { showSideComments    = !showSideComments;    toggleSideComments();    }, "Side Comments",     "Moves comments to the right side of video player");
+             addToggle(menuContainer,                             'showContentSplit',    'ytt-show-content-split',     () => { showContentSplit    = !showContentSplit;    toggleContentSplit();    }, "Content Split",     "Moves comments Above Related Content");
              addToggle(menuContainer,                             'showRecommendations', 'ytt-show-recommendations',   () => { showRecommedations  = !showRecommedations;  toggleRecommendations(); }, "Recommendations",   "Recommendation section on video watchpages");
              addToggle(menuContainer,                             'showEndScreenVideos', 'ytt-show-end-screen-videos', () => { showEndScreenVideos = !showEndScreenVideos; toggleEndScreenVideos(); }, "End Screen Videos", "Videos recommended when a video ends");
              addToggle(menuContainer,                             'showBelow',           'ytt-show-below',             () => { showBelow           = !showBelow;           toggleBelow();           }, "Below Player",      "Everything below the video's player");
@@ -1259,30 +1307,119 @@ Known Issues:
                       addToggleField('enableExperimental', 'ytt-experimental-value',   () => { toggleExperimental()}, 0, 1e6, -1, "number", "ytt-experiemental-id", "Videos (Per Row On Homepage)");
     }
 
+
+
+    
     function updateCommentMenu() {
         try {
             console.log("resizing side comments");
             const split = document.querySelector('#ytt-split-container');
             const player = document.querySelector('#player');
             split.style.height = player.getBoundingClientRect().height + "px";
-            const sidebar = document.querySelector('#secondary');
-            split.style.width = sidebar.getBoundingClientRect().width + "px";
+            const secondary = document.querySelector("#columns #secondary");
+            
+            if(secondary.checkVisibility()) {
+                split.style.width = secondary.getBoundingClientRect().width + "px"; //This is better
+            } else {
+                split.style.width = player.getBoundingClientRect().width + "px"; //But this is needed when isRelatedBelow = true;
+            }
+
+            if(split.style.height == "0px" || split.style.width == "0px") {
+                setTimeout(updateCommentMenu, 500);
+            } else {
+                toggleContentSplit();
+            }
         } catch{}
     }
-    function toggleSideComments() {
-        const commentSection = document.querySelector("#comments");
-        const secondary = document.querySelector("#secondary");
-        const relatedSection = secondary.querySelector('#related');
+
+    function checkOrientation(orientation) { 
+        const secondary = document.querySelector("#columns #secondary");
+        if (orientation == (secondary.offsetParent == null)) {
+            console.debug(orientation, " is ", secondary.offsetParent == null);
+        } else {
+            console.debug(orientation, " is not ", secondary.offsetParent == null);
+            setTimeout(toggleContentSplit, 1000);//orientation has changed, so everything needs to be checked again
+        }
+    }
+
+    function updateSplit() { 
+        console.log("updating split");
+        const split = document.querySelector('#ytt-split-container');        
+
+        const orientationBool = (secondary.offsetParent == null);
+        if (orientationBool) { //vertical 
+            const player = document.querySelector('#player-container');
+                split.style.height = player.getBoundingClientRect().height + "px";
+                split.style.width = player.getBoundingClientRect().width + "px";
+        }
+        else { //landscape
+            const player = document.querySelector('#player');
+                split.style.height = player.getBoundingClientRect().height + "px";
+            const secondary = document.querySelector("#columns #secondary");    
+                split.style.width = secondary.getBoundingClientRect().width + "px";
+        }
+
+        if(split.style.height == "0px" || split.style.width == "0px") {
+            //setTimeout(updateSplit, 500);
+        }
+    }
+
+  //function toggleContentSplit()
+    function toggleContentSplit() {
         const yttContainer = document.querySelector('#ytt-container');
-        if (showSideComments) {
+        const commentSection = document.querySelector("#comments");
+        const secondary = document.querySelector("#columns #secondary");
+
+        let relatedSection = secondary.querySelector('#related');
+        //let isRelatedBelow = false;
+        if (!relatedSection) { //This means that the screen width is below 1000px and is in a vertical stack of player -> related -> comments. the issue with a generic element swap, is similar to the side comment swap, in that the comments will continuously auto update. so the split container is needed anyways
+            relatedSection = document.querySelector("#below #related");
+            //isRelatedBelow = true;
+        }        
+        if (showContentSplit) {
             const commentMenu = document.querySelector('#ytt-comment-menu');
-            const relatedMenu = document.querySelector('#ytt-related-menu'); 
-            commentMenu.appendChild(commentSection);
-            relatedMenu.appendChild(relatedSection);
-            secondary.appendChild(yttContainer);
-            yttContainer.hidden = false;
+            const relatedMenu = document.querySelector('#ytt-related-menu');
+            if ((relatedMenu.children[0]) == undefined || !yttContainer.checkVisibility()) { //something causes secondary-inline to append the relatedSection back to itself. This fixed that from happening 
+                console.debug(relatedMenu.children[0]);
+                commentMenu.appendChild(commentSection);
+                relatedMenu.appendChild(relatedSection);
+                if (secondary.checkVisibility()) {
+                    secondary.appendChild(yttContainer);
+                } else {
+                    const below = document.querySelector("#below");
+                    below.appendChild(yttContainer);
+                }
+                yttContainer.hidden = false;
+                setTimeout(toggleContentSplit, 1000);
+            } 
+            else { //Check if orienation has changed
+                console.debug(secondary.offsetParent == null, yttContainer.checkVisibility()); //This check happens so fast, visibility is still seen as true when changing phone orientation
+
+                const orientationBool = secondary.offsetParent == null
+                const toggleStateBool = yttContainer.checkVisibility();
+
+                const orientation = orientationBool ? "vertical" : "landscape";
+                const toggleState = toggleStateBool ? "on" : "off";
+                console.debug({orientation, toggleState});
+
+                (function fiveSeconds (n) {
+
+                console.log( n++ );
+
+                if (n <= 3) { 
+                    setTimeout( fiveSeconds, 1000, n );
+                    setTimeout(checkOrientation, 1000, orientationBool);
+                } // Redo if n <= 5 (and pass n)
+                else {
+                    updateSplit(); //make sure the size is correct when done
+                }
+                } (0)); // Initialize. n is 0
+
+
+            }
         }
         else {
+            console.log("unappending sections from ytt-split-container");
             secondary.append(relatedSection);
             const below = document.querySelector("#below");
             below.append(commentSection);
@@ -1292,6 +1429,9 @@ Known Issues:
 
 
     function BuildCommentContainer() {
+        console.debug("building comment container");
+        const player = document.querySelector('#player');
+        const secondary = document.querySelector("#columns #secondary");
         const createMenuContainer = () => {
             let menuContainer = document.createElement('div');
             menuContainer.style.overflow  = 'scroll';
@@ -1305,42 +1445,67 @@ Known Issues:
         commentMenu.id = "ytt-comment-menu";
         relatedMenu.id = 'ytt-related-menu';
 
-        
-        
         const split = document.createElement("container");
-        const player = document.querySelector('#player');
-        const sidebar = document.querySelector('#secondary');
-        
-        split.id = "ytt-split-container";
-        split.style.height = player.getBoundingClientRect().height + "px";
-        split.style.width = sidebar.getBoundingClientRect().width + "px";
+            split.id = "ytt-split-container";
+            split.style.height = player.getBoundingClientRect().height + "px";
+            split.style.width = secondary.getBoundingClientRect().width + "px";
         split.appendChild(commentMenu);
         split.appendChild(relatedMenu);
 
-        let yttContainer = document.createElement("ytt-container");
-        yttContainer.id = "ytt-container";
-        yttContainer.style.display = "grid";
-        yttContainer.style.gridTemplateColumns = "auto auto auto";
-        yttContainer.style.padding         = "10px";
-        yttContainer.hidden = true;
+        const yttContainer = document.createElement("ytt-container");
+            yttContainer.id = "ytt-container";
+            yttContainer.style.display = "grid";
+            yttContainer.style.gridTemplateColumns = "auto auto auto";
+            yttContainer.style.padding         = "10px";
+            yttContainer.hidden = true;
         yttContainer.appendChild(split);
-        
+
         document.body.appendChild(yttContainer);
-        toggleSideComments();
+        toggleContentSplit();
+        updateCommentMenu();
     }
 
 
 
     function updateElements() {
         updateMenu();
-        if (getURL_id() == 1 && showSideComments) { //only run on watchpage
+        if (getURL_id() == 1 && showContentSplit) { //only run on watchpage
             updateCommentMenu();
         }
     }
 
-    function createMenuButton() {
+
+    function createYTStyledButton() {
         const voiceSearchButton = document.querySelector('#voice-search-button');
 
+        let youtubeStyledButton = document.createElement('div');
+            youtubeStyledButton.id = 'youtubeStyledButton';
+            youtubeStyledButton.className = 'style-scope ytd-masthead';
+
+        let ytd_button_renderer = document.createElement('ytd-button-renderer');
+            ytd_button_renderer.className = 'style-scope ytd-masthead';
+            
+        youtubeStyledButton.appendChild(ytd_button_renderer)
+
+        document.querySelector("#center").appendChild(youtubeStyledButton);
+        
+        youtubeStyledButton.querySelector('yt-button-shape').after(voiceSearchButton.querySelector('yt-button-shape').cloneNode(true));
+        youtubeStyledButton.querySelector('path').setAttribute('d', 'M21 5H3a1 1 0 000 2h18a1 1 0 100-2Zm-3 6H6a1 1 0 000 2h12a1 1 0 000-2Zm-3 6H9a1 1 0 000 2h6a1 1 0 000-2Z');
+
+        youtubeStyledButton.style.borderRadius = '100px';
+        youtubeStyledButton.style.marginLeft = '12px';
+        youtubeStyledButton.style.backgroundColor = 'var(--yt-sys-color-baseline--additive-background)';
+
+
+        youtubeStyledButton.onclick = function() {
+            toggleMenu();
+        };
+    }
+
+
+
+    function createMenuButton() {
+        const voiceSearchButton = document.querySelector('#voice-search-button');
 
         let yttButton = document.createElement('div'), btnStyle = yttButton.style;
           yttButton.id = 'yttButton';
@@ -1353,30 +1518,20 @@ Known Issues:
 
         document.querySelector("#center").appendChild(yttButton);
 
-
-
-
         let tp_yt_paper_tooltip = yttButton.querySelector('tp-yt-paper-tooltip');
         tp_yt_paper_tooltip.removeAttribute('disable-upgrade');
         tp_yt_paper_tooltip.querySelector('#tooltip').append('Toggle Features');
         tp_yt_paper_tooltip.style.opacity = "0.9";
 
-
-       yttButton.onmouseover = function() {
+        yttButton.onmouseover = function() {
             yttButton.querySelector('#tooltip').className = "show style-scope tp-yt-paper-tooltip";
             let rect = yttButton.getBoundingClientRect();
             tp_yt_paper_tooltip.style.left = rect.x - rect.width + 'px';
             tp_yt_paper_tooltip.style.top = rect.y + rect.height + 6 + 'px';
-       }
-       yttButton.onmouseout = function() {
-           yttButton.querySelector('#tooltip').className = "hidden style-scope tp-yt-paper-tooltip";
-       }
-
-
-
-
-
-
+        }
+        yttButton.onmouseout = function() {
+            yttButton.querySelector('#tooltip').className = "hidden style-scope tp-yt-paper-tooltip";
+        }
 
         yttButton.querySelector('yt-button-shape').after(voiceSearchButton.querySelector('yt-button-shape').cloneNode(true));
         yttButton.querySelector('path').setAttribute('d', 'M21 5H3a1 1 0 000 2h18a1 1 0 100-2Zm-3 6H6a1 1 0 000 2h12a1 1 0 000-2Zm-3 6H9a1 1 0 000 2h6a1 1 0 000-2Z');
@@ -1387,17 +1542,19 @@ Known Issues:
 
         const menu = createMenu();
         BuildMenuContainer(menu);
-
+            
+        
+        //createYTStyledButton();
+        
+        
         setMenuButtonEl(yttButton);
         setMenuEl(menu);
         //window.onresize = updateMenu;
         window.onresize = updateElements;
 
-
         yttButton.onclick = function() {
           toggleMenu();
         };
-
     }
 
     function clearLocalStorage() {
@@ -1422,42 +1579,38 @@ Known Issues:
   TOGGLE CALLERS
   */
 
-      function defaultCalls() {
-          toggleStreamerMode();
-          toggleUIChecks(); //checks homepage versus watchpage
-          toggleLabsFeature();
-      }
+    function defaultCalls() {
+        toggleStreamerMode();
+        toggleUIChecks(); //checks homepage versus watchpage
+        toggleLabsFeature();
+    }
+
+    function homepageCalls() {
+        checkItemsPerRow();
+        processVideos();
+        startShelfChecks();
+        startItemChecks();
+        startItemBadgeChecks();
+    }
+
+    function watchpageCalls() {
+        startVideoChecks();
+        startItemBadgeChecks();
+    }
+
+    function channelpageCalls() {
+
+    }
+
+    function searchPageCalls() {
+        //toggleLabsFeature();
+    }
 
 
 
-
-
-      function homepageCalls() {
-          checkItemsPerRow();
-          processVideos();
-          startShelfChecks();
-          startItemChecks();
-          startItemBadgeChecks();
-      }
-
-      function watchpageCalls() {
-          startVideoChecks();
-          startItemBadgeChecks();
-      }
-
-      function channelpageCalls() {
-
-      }
-
-      function searchPageCalls() {
-          //toggleLabsFeature();
-      }
-
-
-
-      function debugCalls() {
+    function debugCalls() {
         startToggleChecks();
-      }
+    }
 
 
 
@@ -1472,22 +1625,20 @@ Known Issues:
         //console.log("Observers Started");
         try {
             const observer = new MutationObserver(() => {
-                let url = getURL_id();
-                //console.debug({url});
                 toggleExperimental();
                 defaultCalls();
-
-                if (url === 0) {
-                    homepageCalls();
-                    //checkPerformance(homepageCalls);
+                //console.debug("url_id in startObservers(): ", url_id);
+                switch(url_id) {
+                    case 0:
+                        homepageCalls();//checkPerformance(homepageCalls);
+                        break;
+                    case 1:
+                        watchpageCalls();
+                        break;
+                    case 2:
+                        searchPageCalls();
+                        break;
                 }
-                else if (url === 1) {
-                    watchpageCalls();
-                }
-                else if (url === 2) {
-                    searchPageCalls();
-                }
-
             });
             //observer.observe(document.body, { childList: true, subtree: true });
             observer.observe(document.querySelector('ytd-app'), { childList: true, subtree: true });
@@ -1500,77 +1651,49 @@ Known Issues:
         } //restart observers
     }
 
+    function containerElementsExist() {
+        let a = elementExists("#related");
+        let b = elementExists("#columns #secondary");
+        return (a && b)
+    }
 
-  function tryClone() {
-      const vsb_shape_svg = document.querySelector('#voice-search-button yt-button-shape svg');//document.querySelector('#voice-search-button').querySelector('yt-button-shape').querySelector('svg');
-      if (vsb_shape_svg) {
-          vsb_shape_svg.cloneNode(false);
-          return true;
-      }
-      return false;
-  }
 
-  function tryCloneObserver() { //The observer will only disconnect when tryClone() returns true
-      const observer = new MutationObserver(() => {
-        if (tryClone()) {
-          observer.disconnect();
-          createMenuButton();
-          //console.log("script button created");
+
+    function tryClone() {
+        const vsb_shape_svg = document.querySelector('#voice-search-button yt-button-shape svg');//document.querySelector('#voice-search-button').querySelector('yt-button-shape').querySelector('svg');
+        if (vsb_shape_svg) {
+            vsb_shape_svg.cloneNode(false);
+            return true;
         }
-      });
-      observer.observe(document.body, { childList: true, subtree: true });
-  }
+        return false;
+    }
 
-  function observeQuery(query, funCondition, funFinish) {
-      const observer = new MutationObserver(() => {
-        if (funCondition()) {
-          observer.disconnect();
-          funFinish();
-          //console.log("Query Condition Met");
-          return true;
+
+    function observeQuery(query, funCondition, funFinish) {
+        const observer = new MutationObserver(() => {
+            if (funCondition()) {
+            observer.disconnect();
+            funFinish();
+            return true;
+            }
+        });
+        observer.observe(query, { childList: true, subtree: true });
+    }
+
+    function main() {
+        if (url_id == 1) {
+            observeQuery(document.body, containerElementsExist, BuildCommentContainer);
         }
-      });
-      observer.observe(query, { childList: true, subtree: true });
-  }
+        observeQuery(document.body, tryClone, createMenuButton);
+        startObservers();
+    }
 
 
-  function HideAllNotifications() {
-    //let menu = document.querySelector('#contentWrapper').querySelector('#container').querySelector('#items')
-    //menu.querySelectorAll('ytd-notification-renderer')[0].querySelector('button').click()
 
-    //let menu = document.querySelector('#contentWrapper').querySelector('#container').querySelector('#items').querySelectorAll('ytd-notification-renderer')[0].querySelector('button')
-
-    //get the notification
-    //click notification ... button
-    //click hide notification button
-    //repeat, until all notifications are gone
-
-    let menu = document.querySelector('#contentWrapper').querySelector('#container').querySelector('#items').querySelectorAll('ytd-notification-renderer').forEach(item => {
-        item.querySelector('button').click()
-        let hideButton = document.querySelector('.ytd-menu-service-item-renderer')
-        while (!hideButton) {
-            hideButton = document.querySelector('.ytd-menu-service-item-renderer')
-        }
-        hideButton.click()
+    document.addEventListener('DOMContentLoaded', function () {
+        console.log("script started");
+        main();
     });
-
-    //let hideButton = document.querySelector('.ytd-menu-service-item-renderer')
-  }
-
-
-
-
-  function main() {
-      observeQuery(document.body, tryClone, createMenuButton);
-      startObservers();
-  }
-
-
-
-  document.addEventListener('DOMContentLoaded', function () {
-      console.log("script started");
-      main();
-  });
 
 
 
