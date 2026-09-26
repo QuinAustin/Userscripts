@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Toggles
 // @namespace    Violentmonkey Scripts
-// @version      1.1.8
+// @version      1.1.9
 // @description  Allows hiding a variety of YouTube webpage elements
 // @author       -
 // @match        https://www.youtube.com/*
