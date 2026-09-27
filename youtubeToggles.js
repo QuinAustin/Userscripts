@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Toggles
 // @namespace    Violentmonkey Scripts
-// @version      1.1.9
+// @version      1.1.91
 // @description  Allows hiding a variety of YouTube webpage elements
 // @author       -
 // @match        https://www.youtube.com/*
@@ -14,22 +14,19 @@
 // ==/UserScript==
 
 /*
- * For 1.1.9
-   *  Summary: comments can be put above related in vertical mode
+ * For 1.1.91
+   *  Summary: better mobile/small screen support
    *  Fixes:
-   *    getContents() now works in vertical mode for watchpage
+   *    split content should now work better on mobile when in landscape mode 
    *  Removals:
-   *    observerQuery replaced tryCloneObserver function, as it is a better generic functino  
+   *    redundant code in 'updateCommentMenu()'
    *  Additions:
-   *    None
+   *    '#full-bleed-container' is now checked for when using split content. has Added benefit of making '#related' a visible element, normally this gets hidden.
    *  Changes:
-   *    'Side Comments' changed to 'Split Content', to reflect it's use in the vertical orientation mode as well
+   *    replaced majority of updateCommentMenu() with updateSplit(). 
+   *    vertical content split should take up more of the empty space below player. 
    *  TODO: 
-   *    replace majority of updateCommentMenu with updateSplit. 
    *    remove more getURL_ID() with url_id
-   *    check getContents() on homepage in vertical mode
-   *    
-   *    
 */
 
 
@@ -57,7 +54,7 @@ Known Issues:
         if (url === "https://www.youtube.com/" || url === "https://www.youtube.com/?bp=wgUCEAE%3D") { //Homepage || Event Homepage
             return 0;
         }
-        else if (url.startsWith("https://www.youtube.com/watch?v=")) { //Video Link
+        else if (url.startsWith("https://www.youtube.com/watch?")) { //Video Link (removed 'v=' at end of link, mobile (desktop mode) uses "https://www.youtube.com/watch?app=desktop&v=")
             return 1;
         }
         else if (url.startsWith("https://www.youtube.com/results?search_query=")) { //Search Page
@@ -1313,23 +1310,10 @@ Known Issues:
     function updateCommentMenu() {
         try {
             console.log("resizing side comments");
-            const split = document.querySelector('#ytt-split-container');
-            const player = document.querySelector('#player');
-            split.style.height = player.getBoundingClientRect().height + "px";
-            const secondary = document.querySelector("#columns #secondary");
-            
-            if(secondary.checkVisibility()) {
-                split.style.width = secondary.getBoundingClientRect().width + "px"; //This is better
-            } else {
-                split.style.width = player.getBoundingClientRect().width + "px"; //But this is needed when isRelatedBelow = true;
-            }
-
-            if(split.style.height == "0px" || split.style.width == "0px") {
-                setTimeout(updateCommentMenu, 500);
-            } else {
-                toggleContentSplit();
-            }
-        } catch{}
+            updateSplit()
+            toggleContentSplit();
+        }
+        catch{}
     }
 
     function checkOrientation(orientation) { 
@@ -1348,10 +1332,16 @@ Known Issues:
 
         const orientationBool = (secondary.offsetParent == null);
         if (orientationBool) { //vertical 
-            const player = document.querySelector('#player-container');
+            let player = document.querySelector('#player-container');
+                split.style.height = (player.getBoundingClientRect().height*1.5) + "px";
+                split.style.width = player.getBoundingClientRect().width + "px";
+
+            if (split.style.height == "0px" || split.style.width == "0px") { //This happens on mobile landscape mode 
+                player = document.querySelector('#full-bleed-container');
                 split.style.height = player.getBoundingClientRect().height + "px";
                 split.style.width = player.getBoundingClientRect().width + "px";
-        }
+            }
+0        }
         else { //landscape
             const player = document.querySelector('#player');
                 split.style.height = player.getBoundingClientRect().height + "px";
@@ -1360,7 +1350,7 @@ Known Issues:
         }
 
         if(split.style.height == "0px" || split.style.width == "0px") {
-            //setTimeout(updateSplit, 500);
+            setTimeout(updateSplit, 500);
         }
     }
 
